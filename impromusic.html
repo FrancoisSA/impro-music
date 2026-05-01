@@ -2846,6 +2846,68 @@
   // Charge le thème sauvegardé au démarrage
   loadSavedTheme();
 
+  // ════════════════════════════════════════════════
+  // MIGRATION — anciens spectacles IndexedDB → JSON
+  // Lit l'ancienne base 'impromusic-projects' et
+  // propose de télécharger chaque spectacle en .json.
+  // S'affiche automatiquement au démarrage si des
+  // anciens spectacles sont détectés.
+  // ════════════════════════════════════════════════
+  async function _migrateOldProjects() {
+    const DB = 'impromusic-projects', ST = 'projects';
+    const projects = await new Promise(res => {
+      const req = indexedDB.open(DB, 1);
+      req.onupgradeneeded = () => res([]); // base vide ou nouvelle → rien à migrer
+      req.onsuccess = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(ST)) { db.close(); res([]); return; }
+        const r = db.transaction(ST, 'readonly').objectStore(ST).getAll();
+        r.onsuccess = ev => { db.close(); res(ev.target.result); };
+        r.onerror   = ()  => { db.close(); res([]); };
+      };
+      req.onerror = () => res([]);
+    });
+
+    if (!projects.length) return;
+
+    // Affiche le bandeau de migration
+    const banner = document.getElementById('loadBanner');
+    banner.classList.remove('hidden');
+    banner.innerHTML = `
+      <div class="load-dot" style="background:var(--color-music)"></div>
+      <span><strong>${projects.length} ancien${projects.length > 1 ? 's' : ''} spectacle${projects.length > 1 ? 's' : ''}</strong> trouvé${projects.length > 1 ? 's' : ''} — télécharge-les en JSON pour les utiliser avec la nouvelle version</span>
+      <button id="btnMigrate" style="
+        background:var(--accent);color:var(--on-accent);border:none;border-radius:4px;
+        padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:6px;white-space:nowrap;">
+        ⬇ Exporter en JSON
+      </button>
+      <button onclick="document.getElementById('loadBanner').classList.add('hidden')" style="
+        background:none;border:none;color:var(--text-muted);font-size:16px;
+        cursor:pointer;margin-left:auto;padding:0 4px;">✕</button>
+    `;
+
+    document.getElementById('btnMigrate').addEventListener('click', () => {
+      projects.forEach(p => {
+        const payload = {
+          version: '1.0',
+          name: p.name,
+          savedAt: p.savedAt,
+          cues: (p.cues ?? []).map(c => ({ ...c, state: c.state === 'playing' ? 'pending' : c.state })),
+          pads: p.pads ?? [],
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        a.download = (p.name ?? 'spectacle').replace(/[^a-zA-Z0-9_\-\s]/g, '') + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+      showToast(`✓ ${projects.length} fichier${projects.length > 1 ? 's' : ''} téléchargé${projects.length > 1 ? 's' : ''}`);
+      banner.classList.add('hidden');
+    });
+  }
+
   // ── INIT ──
   // Restaure le dernier projet depuis le cache localStorage (survit au rechargement de page).
   // Les fichiers audio sont rechargés depuis IndexedDB (cache audio persistant).
@@ -2854,6 +2916,7 @@
     renderCueList();
     renderPads();
     await preloadAllSounds();
+    await _migrateOldProjects(); // détecte et propose la migration si nécessaire
   })();
 </script>
 </body>
