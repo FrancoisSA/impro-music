@@ -1,0 +1,2885 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ImproMusic — Régie Son</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #2e2e2e;
+    --accent: #e8a020;
+    --text: #fAfAfA;
+    --text-dim: #aaa;
+    --text-muted: #999;
+    --green: #2ecc71;
+    --red: #e74c3c;
+    --red-dark: #c0392b;
+    --radius: 10px;
+    --radius-sm: 6px;
+    /* Nouvelles couleurs */
+    --green-dark: #27ae60;
+    --color-loop: #e67e22;
+    --color-music: #3498db;
+    --color-fx: #9b59b6;
+    --color-ambiance: #1abc9c;
+    --on-accent: #000;
+    --on-red: #fff;
+    --overlay-light: rgba(255,255,255,0.1);
+    --shadow: rgba(0,0,0,0.5);
+    /* Variantes rgba */
+    --accent-bg:   rgba(232,160,32,0.08);
+    --accent-bg2:  rgba(232,160,32,0.12);
+    --accent-glow: rgba(232,160,32,0.2);
+    --accent-bg3:  rgba(230,126,34,0.15);
+    --green-bg:    rgba(46,204,113,0.05);
+    --red-bg:      rgba(231,76,60,0.15);
+    --loop-bg:     rgba(230,126,34,0.2);
+    --loop-bg2:    rgba(230,126,34,0.15);
+    --loop-border: rgba(230,126,34,0.3);
+    --music-bg:    rgba(52,152,219,0.2);
+    --music-bg2:   rgba(52,152,219,0.08);
+    --fx-bg:       rgba(155,89,182,0.2);
+    --ambiance-bg: rgba(26,188,156,0.2);
+    --overlay:     rgba(0,0,0,0.75);
+    --overlay2:    rgba(0,0,0,0.7);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .app-title { font-size: 17px; font-weight: 700; color: var(--accent); }
+  .project-name { font-size: 12px; color: var(--text-dim); flex: 1; }
+  .btn-icon {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius-sm);
+    padding: 5px 9px; font-size: 17px; cursor: pointer; line-height: 1;
+  }
+  .btn-icon:active { background: var(--border); }
+
+  /* ── NOW PLAYING BAR ── */
+  /* ── NOW PLAYING — carte style cue ── */
+  .np-bar {
+    margin: 0;
+    background: var(--accent-bg);
+    border-top: 1px solid var(--accent);
+    border-bottom: 1px solid var(--accent);
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+    padding: 7px 14px 6px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .np-bar.idle {
+    background: var(--surface2);
+    border-color: var(--border);
+  }
+  .np-bar-top {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .np-left  { display: flex; align-items: center; gap: 6px; overflow: hidden; }
+  .np-center {
+    display: flex; align-items: center; gap: 5px;
+    justify-content: center;
+  }
+  .np-center-divider { width: 1px; height: 20px; background: var(--border); margin: 0 3px; }
+  .np-right {
+    display: flex; align-items: center; gap: 6px; justify-content: flex-end;
+    font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden;
+  }
+  .np-next-label { color: var(--text); font-size: 10px; letter-spacing: 0.5px; flex-shrink: 0; }
+  .np-next-name  { color: var(--text); font-weight: 600; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+  .np-bar-meta {
+    font-size: 11px; color: var(--text-dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 5px; min-height: 14px;
+  }
+  .np-bar.idle .np-bar-meta { opacity: 0.3; }
+  /* bouton sourdine actif */
+  .np-btn.sourdine.active { color: var(--color-loop); border-color: var(--color-loop); background: var(--accent-bg3); }
+  .sourdine-bar-track {
+    width: 28px; height: 3px; background: var(--border);
+    border-radius: 2px; margin-top: 3px; overflow: hidden;
+  }
+  .sourdine-bar-fill {
+    height: 100%; width: 0%; background: var(--color-loop);
+    border-radius: 2px; transition: width 0.15s;
+  }
+  .np-btn.sourdine { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  /* bouton silence actif */
+  .np-btn.silence.active { color: var(--red); border-color: var(--red); background: var(--red-bg); }
+  /* bouton fade out */
+  .np-btn.fadeout { color: var(--text-dim); font-size: 28px; }
+  .np-btn.fadeout:hover { color: var(--accent); border-color: var(--accent); }
+  /* bouton suivant */
+  .np-btn.suivant {
+    font-size: 26px; padding: 6px 16px;
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .np-btn.suivant:hover { border-color: var(--accent); color: var(--accent); }
+  .np-badge {
+    font-size: 9px; font-weight: 800; letter-spacing: 1px;
+    background: var(--accent); color: var(--on-accent);
+    padding: 2px 5px; border-radius: 3px; flex-shrink: 0;
+  }
+  .np-bar.idle .np-badge { background: var(--border); color: var(--text-muted); }
+  .np-title { font-size: 13px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  .np-time  { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .np-controls { display: flex; gap: 4px; flex-shrink: 0; }
+  .np-btn {
+    background: none; border: 1px solid transparent; border-radius: 7px;
+    cursor: pointer; font-size: 32px; padding: 6px 14px; line-height: 1;
+    color: var(--text-dim);
+    transition: all 0.1s;
+  }
+  .np-btn:hover  { border-color: var(--border); }
+  .np-btn:active { opacity: 0.6; background: var(--surface2); }
+  .np-btn.play   { color: var(--green); }
+  .np-btn.pause  { color: var(--accent); }
+  .np-btn.stop   { color: var(--red); }
+  .progress-bar { width: 100%; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.1s linear; width: 0%; }
+
+  .no-file-dot { font-size: 9px; color: var(--text-muted); opacity: 0.6; }
+  .has-file-dot { font-size: 9px; color: var(--green); }
+
+  /* ── VOLUME COMPACT (dans le header) ── */
+  .vol-compact { display: flex; align-items: center; gap: 4px; }
+  .vol-icon { font-size: 14px; }
+  .vol-compact input[type="range"] {
+    -webkit-appearance: none; width: 70px; height: 4px;
+    background: var(--border); border-radius: 3px; outline: none;
+  }
+  .vol-compact input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    background: var(--accent); border-radius: 50%; cursor: pointer;
+  }
+  .volume-value { font-size: 11px; color: var(--text-dim); min-width: 30px; }
+
+  /* ── BOUTON PAUSE (compatibilité) ── */
+  .btn-pause { background: none; border: none; cursor: pointer; }
+
+  /* ── MAIN LAYOUT : 2 colonnes ── */
+  .main-columns {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    gap: 0;
+  }
+
+  /* ── COLONNE GAUCHE : séquentielle ── */
+  .col-seq {
+    display: flex;
+    flex-direction: column;
+    width: 52%;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .col-header {
+    padding: 7px 12px 5px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .col-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; flex: 1; }
+  .col-badge {
+    background: var(--surface2); color: var(--text-dim); font-size: 10px;
+    padding: 1px 6px; border-radius: 8px; border: 1px solid var(--border);
+  }
+
+
+  .cue-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cue-list::-webkit-scrollbar { width: 3px; }
+  .cue-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .cue-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 9px 10px; margin-bottom: 5px;
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; transition: all 0.12s; position: relative;
+  }
+  .cue-item:active { background: var(--surface2); }
+  .cue-item.active { border-color: var(--accent); background: var(--accent-bg); }
+  .cue-item.active::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--accent); border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  }
+  .cue-item.next { border-color: var(--green); background: var(--green-bg); }
+  .cue-item.next::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--green); border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  }
+  .cue-item.played { opacity: 0.38; }
+  .cue-item.paused { border-color: var(--color-music); background: var(--music-bg2); }
+  .cue-item.paused::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--color-music); border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  }
+
+  .cue-number { font-size: 10px; font-weight: 700; color: var(--text-muted); min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+  .cue-info { flex: 1; min-width: 0; }
+  .cue-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cue-meta { font-size: 10px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 6px; align-items: center; }
+  .cue-tag { font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
+  .start-at-badge { font-size: 9px; color: var(--accent); font-weight: 700; background: var(--accent-bg2); padding: 1px 5px; border-radius: 3px; }
+  .tag-music    { background: var(--music-bg); color: var(--color-music); }
+  .tag-fx       { background: var(--fx-bg); color: var(--color-fx); }
+  .tag-ambiance { background: var(--ambiance-bg); color: var(--color-ambiance); }
+  .tag-loop     { background: var(--loop-bg); color: var(--color-loop); }
+  .cue-duration { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .cue-status-icon { font-size: 14px; min-width: 18px; text-align: center; flex-shrink: 0; }
+
+  /* La carte entière est cliquable pour play/stop */
+  .cue-item:not(.played) { cursor: pointer; }
+  .cue-item.active { cursor: pointer; }
+
+  /* Indicateur loop */
+  .loop-badge {
+    font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+    background: var(--loop-bg); color: var(--color-loop); border: 1px solid var(--loop-border);
+  }
+  .loop-toggle {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text-muted); font-size: 12px; padding: 2px 6px; cursor: pointer;
+    flex-shrink: 0; line-height: 1; transition: all 0.1s;
+  }
+  .loop-toggle.on {
+    background: var(--loop-bg2); border-color: var(--color-loop); color: var(--color-loop);
+  }
+
+  /* Bandeau de chargement */
+  .load-banner {
+    background: var(--surface2); border-bottom: 1px solid var(--border);
+    padding: 5px 14px; font-size: 11px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .load-banner.hidden { display: none; }
+  .load-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent); animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── MODE ÉDITION ── */
+  .btn-edit-mode {
+    font-size: 11px; font-weight: 700; padding: 3px 9px;
+    border-radius: var(--radius-sm); cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-dim); white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .btn-edit-mode.active {
+    background: var(--accent); color: var(--on-accent); border-color: var(--accent);
+  }
+
+  .cue-item.hidden-cue { opacity: 0.3; }
+  .cue-item.hidden-cue .cue-name { text-decoration: line-through; }
+
+  /* ── SÉPARATEURS DE SECTION ── */
+  .section-sep {
+    display: flex; align-items: center; gap: 8px;
+    margin: 6px 0 3px; cursor: pointer; user-select: none;
+    padding: 4px 6px; border-radius: var(--radius-sm);
+    transition: background 0.1s;
+  }
+  .section-sep:hover { background: var(--surface2); }
+  .section-chevron { font-size: 11px; color: var(--accent); flex-shrink: 0; transition: transform 0.2s; }
+  .section-sep.collapsed .section-chevron { transform: rotate(-90deg); }
+  .section-title {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--accent); flex-shrink: 0;
+  }
+  .section-line {
+    flex: 1; height: 1px; background: var(--accent); opacity: 0.4;
+  }
+  .section-edit-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .btn-add-section {
+    font-size: 11px; font-weight: 700; padding: 3px 9px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text-dim); white-space: nowrap; display: none;
+  }
+  .edit-mode-active .btn-add-section { display: inline-block; }
+  .section-collapsed-cues { display: none; }
+  .section-count { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+
+  .edit-actions {
+    display: flex; gap: 4px; flex-shrink: 0; align-items: center;
+  }
+  .ea-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 16px; padding: 4px 5px; border-radius: 4px;
+    color: var(--text-dim); line-height: 1; transition: all 0.1s;
+  }
+  .ea-btn:active { background: var(--surface2); }
+  .ea-btn.ea-edit    { color: var(--text-dim); }
+  .ea-btn.ea-hide    { color: var(--text-dim); }
+  .ea-btn.ea-hide.is-hidden { color: var(--accent); }
+  .ea-btn.ea-delete  { color: var(--red); }
+  .ea-btn.ea-up, .ea-btn.ea-down { font-size: 14px; }
+
+  /* Boutons transport par cue */
+  .cue-transport { display: flex; gap: 2px; flex-shrink: 0; align-items: center; }
+  .ct-btn {
+    background: none; border: 1px solid transparent; border-radius: 5px;
+    cursor: pointer; font-size: 15px; padding: 3px 6px; color: var(--text-dim);
+    line-height: 1; transition: all 0.1s;
+  }
+  .ct-btn:hover  { border-color: var(--border); color: var(--text); }
+  .ct-btn:active { background: var(--surface2); }
+  .ct-btn.ct-play  { color: var(--green-dark); }
+  .ct-btn.ct-pause { color: var(--accent); }
+  .ct-btn.ct-stop  { color: var(--red); }
+  .ct-btn.ct-next  { color: var(--text-dim); }
+
+  /* Confirmation inline suppression */
+  .delete-confirm {
+    display: flex; gap: 4px; align-items: center; flex-shrink: 0;
+  }
+  .dc-label { font-size: 10px; color: var(--red-dark); font-weight: 700; }
+  .dc-yes {
+    background: var(--red-dark); color: var(--on-red); border: none; border-radius: 4px;
+    padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+  }
+  .dc-no {
+    background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border);
+    border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;
+  }
+
+  /* ── COLONNE DROITE : boutons libres ── */
+  .col-pads {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .pads-col-header {
+    padding: 7px 12px 5px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pads-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pads-scroll::-webkit-scrollbar { width: 3px; }
+  .pads-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Grille 3 sous-colonnes */
+  .pads-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .pad-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    cursor: pointer;
+    padding: 4px 3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    transition: all 0.1s;
+    position: relative;
+    overflow: hidden;
+    min-height: 40px;
+    text-align: center;
+  }
+  .pad-btn:active { transform: scale(0.95); }
+  .pad-btn.playing {
+    border-color: var(--accent);
+    background: var(--accent-bg2);
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+  .pad-btn.playing::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent);
+  }
+
+  /* Couleur par catégorie */
+  .pad-btn[data-type="music"]    { border-left: 3px solid var(--color-music); }
+  .pad-btn[data-type="fx"]       { border-left: 3px solid var(--color-fx); }
+  .pad-btn[data-type="ambiance"] { border-left: 3px solid var(--color-ambiance); }
+  .pad-btn[data-type="loop"]     { border-left: 3px solid var(--color-loop); }
+
+  .pad-delete {
+    position: absolute;
+    top: 2px; right: 2px;
+    background: var(--red-bg);
+    border: none; border-radius: 50%;
+    color: var(--on-red); font-size: 10px;
+    width: 16px; height: 16px;
+    line-height: 16px; text-align: center;
+    cursor: pointer; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pad-delete:hover { background: var(--red); }
+
+  .pad-emoji {
+    font-size: 16px; line-height: 1;
+    cursor: pointer; border-radius: 4px; padding: 1px 3px;
+    transition: background 0.1s;
+  }
+  .pad-emoji:hover { background: var(--overlay-light); }
+  .pad-name {
+    font-size: 9px; font-weight: 600;
+    line-height: 1.2;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+  }
+  .pad-vol { font-size: 9px; color: var(--text-muted); }
+
+  /* Section label de catégorie dans la grille */
+  .pads-section-label {
+    grid-column: 1 / -1;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+    padding: 6px 2px 2px;
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+  }
+  .pads-section-label:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+
+  .pad-add {
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    min-height: 40px;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .pad-add:active { background: var(--surface); }
+
+  /* Bouton dossier */
+  .btn-folder {
+    font-size: 11px; font-weight: 700; padding: 3px 9px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text); white-space: nowrap;
+  }
+  .btn-folder:active { background: var(--border); }
+
+  /* Modal import dossier */
+  .import-overlay {
+    display: none; position: fixed; inset: 0;
+    background: var(--overlay); z-index: 150;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .import-overlay.open { display: flex; }
+  .import-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; width: 100%; max-width: 480px;
+    max-height: 90dvh; overflow-y: auto;
+  }
+  .import-title { font-size: 16px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+  .import-sub   { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+  .import-file-list {
+    max-height: 280px; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    margin-bottom: 16px;
+  }
+  .import-file-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  .import-file-item:last-child { border-bottom: none; }
+  .ifc { /* checkbox area */ flex-shrink: 0; }
+  .ifc input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+  .if-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .if-size { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+  .import-select-all {
+    font-size: 11px; color: var(--accent); cursor: pointer; padding: 4px 0;
+    display: inline-block; margin-bottom: 8px;
+  }
+  .import-dest {
+    display: flex; gap: 8px; margin-bottom: 16px;
+  }
+  .dest-btn {
+    flex: 1; padding: 10px; border-radius: var(--radius-sm); cursor: pointer;
+    font-size: 13px; font-weight: 600; border: 2px solid var(--border);
+    background: var(--surface2); color: var(--text-dim); transition: all 0.15s;
+  }
+  .dest-btn.selected { border-color: var(--accent); background: var(--accent-bg); color: var(--text); }
+  .import-progress-bar {
+    height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 8px;
+  }
+  .import-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width 0.2s; }
+  .import-progress-text { font-size: 11px; color: var(--text-muted); margin-bottom: 16px; }
+  #folderFileInput { display: none; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: var(--overlay2); z-index: 100; align-items: flex-end;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet {
+    background: var(--surface); border-radius: 18px 18px 0 0;
+    border-top: 1px solid var(--border); width: 100%;
+    padding: 20px 20px 40px; max-height: 80dvh; overflow-y: auto;
+  }
+  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; color: var(--accent); }
+  .form-field { margin-bottom: 14px; }
+  .form-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: block; }
+  .form-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text); font-size: 15px; padding: 9px 11px; outline: none;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-row { display: flex; gap: 10px; }
+  .form-row .form-field { flex: 1; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .btn-primary { flex: 1; background: var(--accent); color: var(--on-accent); border: none; border-radius: var(--radius-sm); padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn-secondary { flex: 1; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; font-size: 15px; cursor: pointer; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; top: 8px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 5px 14px; border-radius: 14px;
+    font-size: 12px; font-weight: 500; z-index: 300;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    pointer-events: none; white-space: nowrap; opacity: 0;
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* ── CLASSES UTILITAIRES COULEUR ── */
+  /* Texte rouge pour les confirmations de suppression inline */
+  .delete-text { color: var(--red); }
+  /* Bouton secondaire danger (ex: suppression de spectacle) */
+  .btn-danger { color: var(--red) !important; border-color: var(--red) !important; }
+
+  /* ── PANNEAU THÈME ── */
+  .theme-overlay {
+    display: none; position: fixed; inset: 0;
+    background: var(--overlay); z-index: 200;
+  }
+  .theme-overlay.open { display: block; }
+  .theme-panel {
+    position: fixed; top: 0; right: -320px; width: 300px; height: 100dvh;
+    background: var(--surface); border-left: 1px solid var(--border);
+    z-index: 201; display: flex; flex-direction: column;
+    transition: right 0.25s ease; overflow: hidden;
+  }
+  .theme-panel.open { right: 0; }
+  .theme-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .theme-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .theme-close {
+    background: none; border: none; color: var(--text-dim);
+    font-size: 18px; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .theme-close:hover { color: var(--text); background: var(--surface2); }
+  .theme-body { flex: 1; overflow-y: auto; padding: 10px 14px 20px; }
+  .theme-reset-row { margin-bottom: 12px; }
+  .theme-btn-reset {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); border-radius: var(--radius-sm);
+    padding: 5px 12px; font-size: 12px; cursor: pointer; width: 100%;
+  }
+  .theme-btn-reset:hover { color: var(--text); border-color: var(--text-muted); }
+  .theme-group-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--text-muted);
+    margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+  }
+  .theme-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 5px 0;
+  }
+  .theme-row-label { flex: 1; font-size: 13px; color: var(--text-dim); }
+  .theme-swatch {
+    width: 28px; height: 28px; border-radius: 5px;
+    border: 1px solid var(--border); cursor: pointer; flex-shrink: 0;
+    position: relative; overflow: hidden;
+  }
+  .theme-swatch input[type="color"] {
+    position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px);
+    opacity: 0; cursor: pointer; border: none; padding: 0;
+  }
+  .theme-hex {
+    font-size: 11px; color: var(--text-muted); min-width: 52px;
+    font-family: monospace;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="app-title">🎵 ImproMusic</div>
+  <div class="project-name">—</div>
+  <div style="display:flex;gap:6px;">
+    <button class="btn-folder" onclick="openProjectsModal()" title="Gérer les spectacles">🎭 Spectacles</button>
+    <button class="btn-folder" onclick="openFolderImport()" title="Importer un dossier audio">📂 Dossier</button>
+    <button class="btn-icon" onclick="openAddModal('seq')" title="Ajouter cue séquentiel">+Seq</button>
+    <button class="btn-icon" onclick="openAddModal('pad')" title="Ajouter bouton libre">+Pad</button>
+    <button class="btn-icon" onclick="openThemePanel()" title="Couleurs & thème">⚙</button>
+    <div class="vol-compact" title="Volume master">
+      <span class="vol-icon">🔊</span>
+      <input type="range" id="masterVolume" min="0" max="100" value="80"
+        oninput="document.getElementById('volVal').textContent=this.value+'%'">
+      <span class="volume-value" id="volVal">80%</span>
+    </div>
+  </div>
+</header>
+
+<!-- BANDEAU CHARGEMENT SONS -->
+<div class="load-banner hidden" id="loadBanner">
+  <div class="load-dot"></div>
+  <span id="loadBannerText">Chargement des sons…</span>
+</div>
+
+<!-- NOW PLAYING — pleine largeur -->
+<div class="np-bar idle" id="npBar">
+  <div class="np-bar-top">
+    <!-- gauche : état + titre + temps -->
+    <div class="np-left">
+      <span class="np-badge" id="npBadge">EN COURS</span>
+      <div class="np-title" id="npTitle">—</div>
+      <div class="np-time" id="npTime"></div>
+    </div>
+    <!-- centre : commandes principales -->
+    <div class="np-center">
+      <button class="np-btn play"     id="btnNpPlay"   onclick="handleNpPlay()"   title="Lecture">▶</button>
+      <button class="np-btn pause"    id="btnPause"    onclick="handlePause()"    title="Pause">⏸</button>
+      <button class="np-btn stop"     id="btnNpStop"   onclick="handleStop()"     title="Stop">■</button>
+      <div class="np-center-divider"></div>
+      <button class="np-btn sourdine" id="btnSourdine" onclick="cycleSourdine()" title="Sourdine">
+        🔉
+        <div class="sourdine-bar-track"><div class="sourdine-bar-fill" id="sourdineBar"></div></div>
+      </button>
+      <button class="np-btn silence"  id="btnSilence"  onclick="toggleSilence()"  title="Silence total">🔇</button>
+      <button class="np-btn fadeout"  id="btnFadeOut"  onclick="handleFadeOut()"  title="Fade out">↘</button>
+      <div class="np-center-divider"></div>
+      <button class="np-btn suivant"  id="btnSuivant"  onclick="goNextCue()"      title="Cue suivant">⏭</button>
+    </div>
+    <!-- droite : infos suivant -->
+    <div class="np-right" id="npNext"></div>
+  </div>
+  <div class="np-bar-meta" id="npMeta"></div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<!-- 2 COLONNES -->
+<div class="main-columns">
+
+  <!-- COLONNE GAUCHE : séquentielle -->
+  <div class="col-seq">
+    <div class="col-header">
+      <span class="col-title">Séquence</span>
+      <span class="col-badge" id="cueCount">0</span>
+      <button class="btn-add-section" id="btnAddSection" onclick="addSection()">+ Section</button>
+      <button class="btn-edit-mode" id="btnEditMode" onclick="toggleEditMode()">✏ Éditer</button>
+    </div>
+
+    <!-- Liste -->
+    <div class="cue-list" id="cueList"></div>
+  </div>
+
+  <!-- COLONNE DROITE : pads libres -->
+  <div class="col-pads">
+    <div class="pads-col-header">
+      <span class="col-title">Sons libres</span>
+      <span class="col-badge" id="padCount">9</span>
+    </div>
+    <div class="pads-scroll">
+      <div class="pads-grid" id="padsGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitle">Nouveau cue</div>
+
+    <div class="form-field">
+      <label class="form-label">Nom</label>
+      <input class="form-input" id="fieldName" type="text" placeholder="Ex: Entrée du héros">
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Type</label>
+        <select class="form-input" id="fieldType">
+          <option value="music">🎵 Musique</option>
+          <option value="fx">💥 Effet sonore</option>
+          <option value="ambiance">🌿 Ambiance</option>
+          <option value="loop">🔁 Boucle</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="form-label">Volume %</label>
+        <input class="form-input" id="fieldVol" type="number" min="0" max="100" value="80">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Fade in (s)</label>
+        <input class="form-input" id="fieldFadeIn" type="number" min="0" max="30" value="0" step="0.5">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Fade out (s)</label>
+        <input class="form-input" id="fieldFadeOut" type="number" min="0" max="30" value="2" step="0.5">
+      </div>
+    </div>
+    <div class="form-field" id="fieldStartAtRow">
+      <label class="form-label">Démarrer à (mm:ss) <span style="color:var(--text-muted);font-weight:400;text-transform:none">— laisser vide pour le début</span></label>
+      <input class="form-input" id="fieldStartAt" type="text" placeholder="ex: 1:30" pattern="[0-9]+:[0-5][0-9]">
+    </div>
+    <div class="form-field" id="fieldEndAtRow">
+      <label class="form-label">Finir à <span style="color:var(--text-muted);font-weight:400;text-transform:none">— mm:ss (position) ou -30 (30s avant la fin)</span></label>
+      <input class="form-input" id="fieldEndAt" type="text" placeholder="ex: 2:45  ou  -30">
+    </div>
+    <div class="form-field">
+      <label class="form-label">Fichier audio</label>
+      <div id="fieldCurrentFile" style="font-size:11px;color:var(--text-muted);margin-bottom:5px;display:none;"></div>
+      <input class="form-input" id="fieldFile" type="file" accept="audio/*" style="padding:7px">
+    </div>
+    <div class="form-field" id="fieldLoopRow">
+      <label class="form-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <input type="checkbox" id="fieldLoop" style="width:18px;height:18px;accent-color:var(--accent);">
+        Boucle (loop) — rejouer automatiquement en fin de piste
+      </label>
+    </div>
+    <div class="form-field">
+      <label class="form-label">Notes</label>
+      <input class="form-input" id="fieldNotes" type="text" placeholder="Ex: Attendre la sortie du comédien">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn-primary" id="btnModalAdd" onclick="submitModal()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORT DOSSIER -->
+<div class="import-overlay" id="importOverlay">
+  <div class="import-box">
+    <div class="import-title">📂 Importer un dossier audio</div>
+    <div class="import-sub">Sélectionne les fichiers à charger</div>
+
+    <span class="import-select-all" id="importSelectAll" onclick="toggleSelectAll()">Tout sélectionner</span>
+    <div class="import-file-list" id="importFileList"></div>
+
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Ajouter dans :</div>
+    <div class="import-dest">
+      <button class="dest-btn selected" id="destSeq" onclick="selectDest('seq')">📋 Séquence</button>
+      <button class="dest-btn" id="destPad" onclick="selectDest('pad')">🎛 Sons libres</button>
+    </div>
+
+    <div class="import-progress-bar"><div class="import-progress-fill" id="importProgressFill"></div></div>
+    <div class="import-progress-text" id="importProgressText"></div>
+
+    <div style="display:flex;gap:10px;">
+      <button class="btn-secondary" onclick="closeImport()">Annuler</button>
+      <button class="btn-primary" id="btnImportConfirm" onclick="confirmImport()">Importer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Input fichiers fallback (webkitdirectory) -->
+<input type="file" id="folderFileInput" multiple accept="audio/*" webkitdirectory>
+
+<!-- MODAL SPECTACLES -->
+<div class="modal-overlay" id="projectsModal">
+  <div class="modal-sheet" style="max-width:480px;width:100%">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🎭 Spectacles</div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <input id="projectNameInput" type="text" placeholder="Nom du spectacle…" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:14px;">
+      <button class="btn-primary" onclick="saveCurrentProject()">💾 Sauver</button>
+    </div>
+
+    <div id="projectsList" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeProjectsModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- PANNEAU THÈME -->
+<div class="theme-overlay" id="themeOverlay" onclick="closeThemePanel()"></div>
+<div class="theme-panel" id="themePanel">
+  <div class="theme-header">
+    <span class="theme-title">⚙ Couleurs & Thème</span>
+    <button class="theme-close" onclick="closeThemePanel()">✕</button>
+  </div>
+  <div class="theme-body">
+    <div class="theme-reset-row">
+      <button class="theme-btn-reset" onclick="resetTheme()">↺ Réinitialiser</button>
+    </div>
+    <!-- Groupe Fond & Surfaces -->
+    <div class="theme-group-label">Fond & Surfaces</div>
+    <div class="theme-row" data-var="--bg"       data-label="Fond principal"></div>
+    <div class="theme-row" data-var="--surface"  data-label="Surface (cartes)"></div>
+    <div class="theme-row" data-var="--surface2" data-label="Surface secondaire"></div>
+    <div class="theme-row" data-var="--border"   data-label="Bordures"></div>
+    <!-- Groupe Texte -->
+    <div class="theme-group-label">Texte</div>
+    <div class="theme-row" data-var="--text"       data-label="Texte principal"></div>
+    <div class="theme-row" data-var="--text-dim"   data-label="Texte secondaire"></div>
+    <div class="theme-row" data-var="--text-muted" data-label="Texte discret"></div>
+    <!-- Groupe Accent -->
+    <div class="theme-group-label">Couleur accent</div>
+    <div class="theme-row" data-var="--accent"     data-label="Accent (orange)"></div>
+    <!-- Groupe Actions -->
+    <div class="theme-group-label">Boutons d'action</div>
+    <div class="theme-row" data-var="--green"      data-label="Play (grand)"></div>
+    <div class="theme-row" data-var="--green-dark" data-label="Play (cartes)"></div>
+    <div class="theme-row" data-var="--red"        data-label="Stop / Supprimer"></div>
+    <div class="theme-row" data-var="--red-dark"   data-label="Confirmation suppression"></div>
+    <!-- Groupe Types de sons -->
+    <div class="theme-group-label">Types de sons</div>
+    <div class="theme-row" data-var="--color-music"    data-label="Musique"></div>
+    <div class="theme-row" data-var="--color-fx"       data-label="Effets (FX)"></div>
+    <div class="theme-row" data-var="--color-ambiance" data-label="Ambiance"></div>
+    <div class="theme-row" data-var="--color-loop"     data-label="Boucle / Sourdine"></div>
+  </div>
+</div>
+
+<script>
+  // ════════════════════════════════════════════════
+  // CACHE AUDIO — IndexedDB
+  // Stocke les ArrayBuffers bruts des MP3 sous leur
+  // nom de fichier (ex: "foret.mp3") → fonctionne
+  // sans serveur, sans réseau, de façon permanente.
+  // ════════════════════════════════════════════════
+  const audioDB = (() => {
+    const DB   = 'impromusic-audio';
+    const ST   = 'buffers';
+    let _db    = null;
+
+    function open() {
+      if (_db) return Promise.resolve(_db);
+      return new Promise((res, rej) => {
+        const r = indexedDB.open(DB, 1);
+        r.onupgradeneeded = e => e.target.result.createObjectStore(ST);
+        r.onsuccess = e => { _db = e.target.result; res(_db); };
+        r.onerror   = e => rej(e.target.error);
+      });
+    }
+
+    async function save(key, ab) {
+      const d  = await open();
+      return new Promise((res, rej) => {
+        const tx = d.transaction(ST, 'readwrite');
+        tx.objectStore(ST).put(ab, key);
+        tx.oncomplete = res;
+        tx.onerror    = e => rej(e.target.error);
+      });
+    }
+
+    async function get(key) {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const r = d.transaction(ST).objectStore(ST).get(key);
+        r.onsuccess = e => res(e.target.result ?? null);
+        r.onerror   = e => rej(e.target.error);
+      });
+    }
+
+    async function allKeys() {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const r = d.transaction(ST).objectStore(ST).getAllKeys();
+        r.onsuccess = e => res(e.target.result);
+        r.onerror   = e => rej(e.target.error);
+      });
+    }
+
+    async function remove(key) {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const tx = d.transaction(ST, 'readwrite');
+        tx.objectStore(ST).delete(key);
+        tx.oncomplete = res;
+        tx.onerror    = e => rej(e.target.error);
+      });
+    }
+
+    async function clear() {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const tx = d.transaction(ST, 'readwrite');
+        tx.objectStore(ST).clear();
+        tx.oncomplete = res;
+        tx.onerror    = e => rej(e.target.error);
+      });
+    }
+
+    return { save, get, allKeys, remove, clear };
+  })();
+
+  // ════════════════════════════════════════════════
+  // PROJETS — sauvegarde/chargement des spectacles
+  // ════════════════════════════════════════════════
+  const projectsDB = (() => {
+    const DB = 'impromusic-projects', ST = 'projects';
+    let _db = null;
+
+    function open() {
+      if (_db) return Promise.resolve(_db);
+      return new Promise((res, rej) => {
+        const req = indexedDB.open(DB, 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore(ST, { keyPath: 'id' });
+        req.onsuccess = e => { _db = e.target.result; res(_db); };
+        req.onerror   = e => rej(e.target.error);
+      });
+    }
+
+    async function saveProject(project) {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const tx = d.transaction(ST, 'readwrite');
+        tx.objectStore(ST).put(project);
+        tx.oncomplete = res;
+        tx.onerror    = e => rej(e.target.error);
+      });
+    }
+
+    async function listProjects() {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const req = d.transaction(ST, 'readonly').objectStore(ST).getAll();
+        req.onsuccess = e => res(e.target.result);
+        req.onerror   = e => rej(e.target.error);
+      });
+    }
+
+    async function loadProject(id) {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const req = d.transaction(ST, 'readonly').objectStore(ST).get(id);
+        req.onsuccess = e => res(e.target.result ?? null);
+        req.onerror   = e => rej(e.target.error);
+      });
+    }
+
+    async function deleteProject(id) {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const tx = d.transaction(ST, 'readwrite');
+        tx.objectStore(ST).delete(id);
+        tx.oncomplete = res;
+        tx.onerror    = e => rej(e.target.error);
+      });
+    }
+
+    return { saveProject, listProjects, loadProject, deleteProject };
+  })();
+
+  // ════════════════════════════════════════════════
+  // MOTEUR AUDIO — Web Audio API
+  // ════════════════════════════════════════════════
+  const engine = (() => {
+    let ctx = null;
+    let masterGain = null;
+    const buffers = new Map(); // id (string|number) → AudioBuffer
+
+    // État de lecture courante
+    let activeSource = null;   // AudioBufferSourceNode en cours
+    let activeGain   = null;   // GainNode de la source active
+    let activeId     = null;   // id du cue ou pad actif
+    let ctxTimeAtStart = 0;    // ctx.currentTime au moment du start()
+    let bufferOffset   = 0;    // offset de départ dans le buffer (startAt)
+    let activeDuration = 0;    // durée totale du buffer actif
+    let pausedOffset   = null; // offset mémorisé à la pause (null = pas en pause)
+    let endCallback    = null;
+
+    function _ensureCtx() {
+      if (!ctx) {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = ctx.createGain();
+        masterGain.gain.value = 0.8;
+        masterGain.connect(ctx.destination);
+      }
+      // Chrome mobile suspend l'AudioContext jusqu'au premier geste
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx;
+    }
+
+    // Charge un File → AudioBuffer + sauvegarde dans IDB sous dbKey
+    async function loadFile(id, file, dbKey) {
+      _ensureCtx();
+      const ab = await file.arrayBuffer();
+      // slice(0) crée une copie pour decodeAudioData — ab reste intact pour l'IDB
+      const decoded = await ctx.decodeAudioData(ab.slice(0));
+      buffers.set(String(id), decoded);
+      if (dbKey) {
+        await audioDB.save(dbKey, ab);
+      }
+      return decoded;
+    }
+
+    // Charge depuis IDB (ArrayBuffer stocké) → décode
+    async function loadFromIDB(id, dbKey) {
+      _ensureCtx();
+      const ab = await audioDB.get(dbKey);
+      if (!ab) throw new Error('Non trouvé en cache: ' + dbKey);
+      const decoded = await ctx.decodeAudioData(ab.slice(0));
+      buffers.set(String(id), decoded);
+      return decoded;
+    }
+
+    // Charge depuis une URL puis met en cache IDB
+    async function loadUrl(id, url) {
+      _ensureCtx();
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const ab = await resp.arrayBuffer();
+      const decoded = await ctx.decodeAudioData(ab.slice(0));
+      buffers.set(String(id), decoded);
+      // Met en cache sous le nom de fichier extrait de l'URL
+      const key = url.split('/').pop();
+      await audioDB.save(key, ab);
+      return decoded;
+    }
+
+    function hasBuffer(id) { return buffers.has(String(id)); }
+    function getDuration(id) { return buffers.get(String(id))?.duration ?? null; }
+
+    // Arrêt hard (sans fade) de la source active
+    function _hardStop() {
+      if (!activeSource) return;
+      activeSource.onended = null;
+      try { activeSource.stop(0); } catch (_) {}
+      activeSource.disconnect();
+      activeGain.disconnect();
+      activeSource = null;
+      activeGain   = null;
+      activeId     = null;
+      pausedOffset = null;
+    }
+
+    // Lance la lecture d'un buffer
+    // opts : { vol, fadeIn, fadeOut, offset, endAt, loop }
+    function _startSource(id, opts, onEnded) {
+      const c = _ensureCtx();
+      const buf = buffers.get(String(id));
+      if (!buf) return false;
+
+      const { vol = 1, fadeIn = 0, fadeOut = 0, offset = 0, endAt = 0, loop = false } = opts;
+      const safeOffset = Math.min(Math.max(offset, 0), buf.duration - 0.01);
+      // Résoudre endAt : négatif = offset depuis la fin, positif = position absolue
+      const resolvedEndAt = endAt < 0 ? buf.duration + endAt : endAt;
+      const playDuration = (resolvedEndAt > 0 && resolvedEndAt > safeOffset && resolvedEndAt <= buf.duration)
+        ? resolvedEndAt - safeOffset : null;
+
+      const gain   = c.createGain();
+      const source = c.createBufferSource();
+      source.buffer = buf;
+      source.loop   = loop;
+      source.connect(gain);
+      gain.connect(masterGain);
+
+      // Fade in
+      if (fadeIn > 0) {
+        gain.gain.setValueAtTime(0.0001, c.currentTime);
+        gain.gain.linearRampToValueAtTime(vol, c.currentTime + fadeIn);
+      } else {
+        gain.gain.setValueAtTime(vol, c.currentTime);
+      }
+
+      // Arrêt programmé si endAt défini
+      if (playDuration !== null) {
+        source.start(0, safeOffset, playDuration);
+      } else {
+        source.start(0, safeOffset);
+      }
+
+      activeSource   = source;
+      activeGain     = gain;
+      activeId       = id;
+      ctxTimeAtStart = c.currentTime;
+      bufferOffset   = safeOffset;
+      // activeDuration tient compte de endAt pour la barre de progression
+      activeDuration = playDuration !== null ? playDuration : buf.duration - safeOffset;
+      pausedOffset   = null;
+      endCallback    = onEnded;
+
+      // Fade out programmé (hors boucle)
+      const effectiveDuration = playDuration ?? (buf.duration - safeOffset);
+      if (!loop && fadeOut > 0 && effectiveDuration > fadeOut) {
+        const fadeStart = c.currentTime + effectiveDuration - fadeOut;
+        gain.gain.setValueAtTime(vol, fadeStart);
+        gain.gain.linearRampToValueAtTime(0.0001, fadeStart + fadeOut);
+      }
+
+      source.onended = () => {
+        // N'appelle le callback que si c'est une fin naturelle (pas un stop/pause)
+        if (activeId === id && pausedOffset === null) {
+          activeSource = null;
+          activeGain   = null;
+          activeId     = null;
+          if (endCallback) endCallback();
+        }
+      };
+
+      return true;
+    }
+
+    // Arrêt avec fade optionnel
+    function stop(fadeOut = 0) {
+      if (!activeSource) return;
+      if (fadeOut > 0) {
+        const c = ctx;
+        const now = c.currentTime;
+        activeGain.gain.cancelScheduledValues(now);
+        activeGain.gain.setValueAtTime(activeGain.gain.value, now);
+        activeGain.gain.linearRampToValueAtTime(0.0001, now + fadeOut);
+        const src = activeSource;
+        activeSource.onended = null;
+        activeId     = null;
+        activeSource = null;
+        activeGain   = null;
+        pausedOffset = null;
+        setTimeout(() => { try { src.stop(); } catch(_){} }, (fadeOut + 0.1) * 1000);
+      } else {
+        _hardStop();
+      }
+    }
+
+    // Lecture publique — stoppe l'éventuel son en cours avant
+    function play(id, opts, onEnded) {
+      _hardStop();
+      return _startSource(id, opts, onEnded);
+    }
+
+    // Pause : mémorise la position courante et stoppe la source
+    function pause() {
+      if (!activeSource || !ctx) return;
+      pausedOffset = (ctx.currentTime - ctxTimeAtStart) + bufferOffset;
+      activeSource.onended = null;
+      try { activeSource.stop(0); } catch(_) {}
+      activeSource.disconnect();
+      activeGain.disconnect();
+      activeSource = null;
+      activeGain   = null;
+      // activeId reste défini pour savoir quel cue est en pause
+    }
+
+    // Reprise depuis l'offset mémorisé
+    function resume(id, opts) {
+      if (pausedOffset === null) return false;
+      const offset = pausedOffset;
+      pausedOffset = null;
+      return _startSource(id, { ...opts, offset, fadeIn: 0 }, endCallback);
+    }
+
+    // Position de lecture en secondes (null si rien ne joue)
+    function getElapsed() {
+      if (!ctx || activeId === null) return null;
+      if (pausedOffset !== null) return pausedOffset;
+      return Math.min((ctx.currentTime - ctxTimeAtStart) + bufferOffset, activeDuration);
+    }
+
+    function setMasterVolume(v) {
+      if (masterGain) masterGain.gain.value = v;
+    }
+
+    function isPlaying(id) { return id !== undefined ? activeId === id && pausedOffset === null : activeId !== null && pausedOffset === null; }
+    function isPaused()    { return pausedOffset !== null; }
+    function currentId()   { return activeId; }
+
+    function copyBuffer(fromId, toId) {
+      const b = buffers.get(String(fromId));
+      if (b) buffers.set(String(toId), b);
+    }
+
+    function clearBuffers() { buffers.clear(); }
+    function clearBuffer(id) { buffers.delete(String(id)); }
+
+    return {
+      loadFile, loadUrl, loadFromIDB, hasBuffer, getDuration, _copyBuffer: copyBuffer,
+      play, stop, pause, resume,
+      getElapsed, setMasterVolume,
+      isPlaying, isPaused, currentId,
+      ensureCtx: _ensureCtx,
+      clearBuffers, clearBuffer,
+    };
+  })();
+
+  // ════════════════════════════════════════════════
+  // DONNÉES
+  // ════════════════════════════════════════════════
+  const cues = [];
+  const pads = [];
+
+  const typeEmojis = { music:'🎵', fx:'💥', ambiance:'🌿', loop:'🔁' };
+
+  // État UI courant
+  let modalTarget  = 'seq';
+  let currentCue   = null;
+  let currentPad   = null;
+  let editMode     = false;
+  let sourdineLevel  = 0;    // 0=off, 1=−25%, 2=−50%, 3=−75%
+  let silenceActive  = false;
+  let editingCueId = null;   // null = création, sinon id du cue à modifier
+  let confirmDeleteId = null; // id du cue en attente de confirmation de suppression
+  let currentProjectId   = null;  // id du spectacle actif (null = non sauvegardé)
+  let currentProjectName = null;
+
+  // ════════════════════════════════════════════════
+  // UTILITAIRES TEMPS
+  // ════════════════════════════════════════════════
+  function secToMmss(sec) {
+    const s = Math.floor(sec);
+    return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  }
+  function mmssToSec(str) {
+    if (!str) return 0;
+    const p = str.split(':');
+    return parseInt(p[0]||0)*60 + parseInt(p[1]||0);
+  }
+
+  // Parse le champ "Finir à" : mm:ss → positif absolu, -30 → négatif (offset depuis la fin)
+  function parseEndAt(str) {
+    if (!str) return 0;
+    str = str.trim();
+    if (str.startsWith('-')) {
+      const secs = parseFloat(str.slice(1));
+      return isNaN(secs) ? 0 : -secs; // valeur négative = offset depuis la fin
+    }
+    return mmssToSec(str);
+  }
+
+  // ════════════════════════════════════════════════
+  // WAKE LOCK
+  // ════════════════════════════════════════════════
+  async function requestWakeLock() {
+    try { await navigator.wakeLock.request('screen'); } catch(_) {}
+  }
+
+  // ════════════════════════════════════════════════
+  // BARRE NOW PLAYING — état centralisé
+  // ════════════════════════════════════════════════
+  // state : 'idle' | 'playing' | 'paused'
+  function _nextCueInSeq() {
+    const playableCues = cues.filter(c => c.type !== 'section');
+    if (!currentCue) return playableCues[0] ?? null;
+    const idx = playableCues.findIndex(c => c.id === currentCue.id);
+    return idx >= 0 ? (playableCues[idx + 1] ?? null) : null;
+  }
+
+  function _renderNpMeta(cue) {
+    const meta = document.getElementById('npMeta');
+    const next = document.getElementById('npNext');
+    if (!cue) { meta.textContent = ''; next.innerHTML = ''; return; }
+
+    const tags = [];
+    if (cue.loop ?? cue.type === 'loop') tags.push('🔁 Boucle');
+    if (cue.fadeIn)  tags.push(`↗ ${cue.fadeIn}s`);
+    if (cue.fadeOut) tags.push(`↘ ${cue.fadeOut}s`);
+    if (cue.notes)   tags.push(`📝 ${cue.notes}`);
+    meta.textContent = tags.join('  ·  ');
+
+    const nextCue = _nextCueInSeq();
+    if (nextCue) {
+      next.innerHTML = `<span class="np-next-label">SUIVANT</span><span class="np-next-name">${nextCue.name}</span>`;
+    } else {
+      next.innerHTML = '<span class="np-next-label">FIN DE SÉQUENCE</span>';
+    }
+  }
+
+  function goNextCue() {
+    const next = _nextCueInSeq();
+    if (!next) return;
+    playDirectCue(next);
+  }
+
+  const SOURDINE_STEPS = [
+    { label: '−50%', factor: 0.50 },
+    { label: '−75%', factor: 0.25 },
+    { label: '−90%', factor: 0.1 },
+  ];
+
+  function _applyVolume() {
+    const base = document.getElementById('masterVolume').value / 100;
+    let v = base;
+    if (silenceActive)      v = 0;
+    else if (sourdineLevel) v = base * SOURDINE_STEPS[sourdineLevel - 1].factor;
+    engine.setMasterVolume(v);
+  }
+
+  function cycleSourdine() {
+    sourdineLevel = (sourdineLevel + 1) % (SOURDINE_STEPS.length + 1); // 0→1→2→3→0
+    // Désactive le silence si on active la sourdine
+    if (sourdineLevel > 0 && silenceActive) {
+      silenceActive = false;
+      document.getElementById('btnSilence').classList.remove('active');
+    }
+    const btn = document.getElementById('btnSourdine');
+    const bar = document.getElementById('sourdineBar');
+    // La barre représente l'atténuation : 0% = off, 100% = atténuation max
+    const pct = sourdineLevel === 0 ? 0 : [25, 50, 75][sourdineLevel - 1];
+    bar.style.width = pct + '%';
+    if (sourdineLevel === 0) {
+      btn.classList.remove('active');
+      showToast('🔊 Sourdine désactivée');
+    } else {
+      const step = SOURDINE_STEPS[sourdineLevel - 1];
+      btn.classList.add('active');
+      showToast('🔉 Sourdine ' + step.label);
+    }
+    _applyVolume();
+  }
+
+  function toggleSilence() {
+    silenceActive = !silenceActive;
+    document.getElementById('btnSilence').classList.toggle('active', silenceActive);
+    _applyVolume();
+    showToast(silenceActive ? '🔇 Silence' : '🔊 Son rétabli');
+  }
+
+  function handleFadeOut() {
+    if (!engine.isPlaying() && !engine.isPaused()) return;
+    const FADE = 2;
+    engine.stop(FADE);
+    stopProgressLoop();
+    showToast('↘ Fade out ' + FADE + 's');
+    // Met à jour l'UI après la fin du fade
+    setTimeout(() => {
+      if (currentCue) { currentCue.state = 'played'; delete currentCue._prevState; }
+      currentCue = null;
+      currentPad = null;
+      updateNpBar('idle');
+      renderCueList();
+      renderPads();
+    }, (FADE + 0.15) * 1000);
+  }
+
+  function updateNpBar(state, name, cue) {
+    const bar      = document.getElementById('npBar');
+    const badge    = document.getElementById('npBadge');
+    const title    = document.getElementById('npTitle');
+    const btnPlay  = document.getElementById('btnNpPlay');
+    const btnPause = document.getElementById('btnPause');
+    const btnStop  = document.getElementById('btnNpStop');
+
+    if (state === 'idle') {
+      bar.classList.add('idle');
+      badge.textContent = 'EN COURS';
+      title.textContent = '—';
+      document.getElementById('npTime').textContent = '';
+      document.getElementById('progressFill').style.width = '0%';
+      btnPlay.style.display  = '';
+      btnPause.style.display = 'none';
+      btnStop.style.display  = 'none';
+      _renderNpMeta(null);
+    } else if (state === 'playing') {
+      bar.classList.remove('idle');
+      badge.textContent = '▶ EN COURS';
+      if (name) title.textContent = name;
+      btnPlay.style.display  = 'none';
+      btnPause.style.display = '';
+      btnPause.textContent   = '⏸';
+      btnStop.style.display  = '';
+      if (cue) _renderNpMeta(cue);
+    } else if (state === 'paused') {
+      bar.classList.remove('idle');
+      badge.textContent = '⏸ PAUSE';
+      btnPlay.style.display  = 'none';
+      btnPause.style.display = '';
+      btnPause.textContent   = '▶';
+      btnStop.style.display  = '';
+    }
+  }
+
+  function handleNpPlay() {
+    if (!currentCue) return;
+    if (engine.isPaused()) {
+      engine.resume(currentCue.id, {
+        vol: currentCue.vol, fadeIn: 0, fadeOut: currentCue.fadeOut,
+        loop: currentCue.loop ?? (currentCue.type === 'loop'),
+      });
+      startProgressLoop();
+      updateNpBar('playing');
+      renderCueList();
+    }
+  }
+
+  // ════════════════════════════════════════════════
+  // BOUCLE DE PROGRESSION (requestAnimationFrame)
+  // ════════════════════════════════════════════════
+  let rafId = null;
+
+  function startProgressLoop() {
+    if (rafId) return;
+    function tick() {
+      const elapsed = engine.getElapsed();
+      if (elapsed !== null && currentCue) {
+        const dur = engine.getDuration(currentCue.id);
+        if (dur) {
+          const pct = Math.min(elapsed / dur * 100, 100);
+          document.getElementById('progressFill').style.width = pct.toFixed(2) + '%';
+          document.getElementById('npTime').textContent =
+            secToMmss(elapsed) + ' / ' + secToMmss(dur);
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function stopProgressLoop() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('npTime').textContent = '';
+  }
+
+  // ════════════════════════════════════════════════
+  // CONTRÔLES TRANSPORT
+  // ════════════════════════════════════════════════
+
+  // Réinitialise l'UI "now playing" et arrête l'audio (avec fade si cue actif)
+  function stopAll() {
+    const fadeOut = currentCue ? currentCue.fadeOut : 0;
+    engine.stop(fadeOut);
+    currentCue = null;
+    currentPad = null;
+    stopProgressLoop();
+    updateNpBar('idle');
+  }
+
+  function handleGo() {
+    // Sauter les cues masqués
+    let nextIdx = cues.findIndex(c => c.state === 'next' && !c.hidden);
+    if (nextIdx < 0) nextIdx = cues.findIndex(c => c.state === 'pending' && !c.hidden);
+    if (nextIdx < 0) { showToast('Fin de liste'); return; }
+
+    engine.ensureCtx(); // initialise l'AudioContext sur geste utilisateur
+    requestWakeLock();
+
+    // Reset tous les états de lecture précédents
+    cues.forEach(c => {
+      if (c.state === 'playing') c.state = 'played';
+      else if (c.state === 'next') c.state = 'pending';
+    });
+
+    // Arrêt propre avec fade de l'éventuel son précédent
+    stopAll();
+
+    const cue = cues[nextIdx];
+    cue.state = 'playing';
+    if (nextIdx + 1 < cues.length) cues[nextIdx + 1].state = 'next';
+    currentCue = cue;
+    currentPad = null;
+
+    updateNpBar('playing', cue.name, cue);
+
+    const hasAudio = engine.play(cue.id, {
+      vol:     cue.vol,
+      fadeIn:  cue.fadeIn,
+      fadeOut: cue.fadeOut,
+      offset:  cue.startAt,
+      endAt:   cue.endAt ?? 0,
+      loop:    cue.loop ?? (cue.type === 'loop'),
+    }, () => onCueEnded(cue));
+
+    if (!hasAudio) {
+      showToast('⚠ Aucun fichier audio pour : ' + cue.name);
+      updateNpBar('idle');
+    } else {
+      startProgressLoop();
+      showToast('▶ ' + cue.name + (cue.startAt > 0 ? '  ↦ ' + secToMmss(cue.startAt) : ''));
+    }
+
+    renderCueList();
+    renderPads();
+  }
+
+  function onCueEnded(cue) {
+    cue.state = 'played';
+    currentCue = null;
+    stopProgressLoop();
+    updateNpBar('idle');
+    renderCueList();
+    // Avance automatiquement l'indicateur "next"
+    const nextIdx = cues.findIndex(c => c.state === 'next');
+    if (nextIdx >= 0) updateGoButton();
+  }
+
+  function handleStop() {
+    stopAll();
+    // Remettre le cue "playing" en "played" s'il reste en cet état
+    const idx = cues.findIndex(c => c.state === 'playing');
+    if (idx >= 0) cues[idx].state = 'played';
+    showToast('■ Stop');
+    renderCueList();
+    renderPads();
+  }
+
+  function handlePause() {
+    if (!currentCue && !currentPad) return;
+
+    if (engine.isPaused()) {
+      const item = currentCue || currentPad;
+      const ok = engine.resume(item.id, {
+        vol:     item.vol,
+        fadeOut: item.fadeOut ?? 0,
+        loop:    item.loop ?? (item.type === 'loop'),
+      });
+      if (ok) {
+        startProgressLoop();
+        updateNpBar('playing');
+        showToast('▶ Reprise');
+      }
+    } else {
+      engine.pause();
+      stopProgressLoop();
+      updateNpBar('paused');
+      showToast('⏸ Pause');
+    }
+    renderCueList();
+  }
+
+  // ── Jouer un cue directement (hors séquence) ──
+  function playDirectCue(cue) {
+    engine.ensureCtx();
+    requestWakeLock();
+
+    // Si ce cue est en pause → reprendre
+    if (currentCue?.id === cue.id && engine.isPaused()) {
+      engine.resume(cue.id, { vol: cue.vol, fadeIn: 0, fadeOut: cue.fadeOut, loop: cue.loop ?? (cue.type === 'loop') });
+      startProgressLoop();
+      updateNpBar('playing');
+      showToast('▶ Reprise — ' + cue.name);
+      renderCueList();
+      return;
+    }
+
+    // Si ce cue est en lecture → pause
+    if (currentCue?.id === cue.id && engine.isPlaying(cue.id)) {
+      engine.pause();
+      stopProgressLoop();
+      updateNpBar('paused');
+      showToast('⏸ Pause — ' + cue.name);
+      renderCueList();
+      return;
+    }
+
+    cue._prevState = cue.state;
+    stopAll();
+    // Reset any cue stuck in 'playing' or 'next' state from the previous playback
+    cues.forEach(c => { if (c.id !== cue.id && (c.state === 'playing' || c.state === 'next')) c.state = 'pending'; });
+    cue.state = 'playing';
+    currentCue = cue;
+    currentPad = null;
+    updateNpBar('playing', cue.name, cue);
+
+    const ok = engine.play(cue.id, {
+      vol: cue.vol, fadeIn: cue.fadeIn, fadeOut: cue.fadeOut,
+      offset: cue.startAt, endAt: cue.endAt ?? 0, loop: cue.loop ?? (cue.type === 'loop'),
+    }, () => {
+      cue.state = 'played';
+      delete cue._prevState;
+      currentCue = null;
+      stopProgressLoop();
+      updateNpBar('idle');
+      renderCueList();
+    });
+
+    if (!ok) {
+      showToast('⚠ Aucun fichier pour : ' + cue.name);
+      cue.state = cue._prevState ?? 'pending';
+      delete cue._prevState;
+      currentCue = null;
+      updateNpBar('idle');
+    } else {
+      startProgressLoop();
+      showToast('▶ ' + cue.name);
+    }
+    renderCueList();
+    renderPads();
+  }
+
+  function jumpToCue(i) {
+    if (editMode) return; // en mode édition, le tap ne saute pas
+    stopAll();
+    const idx = cues.findIndex(c => c.state === 'playing');
+    if (idx >= 0) cues[idx].state = 'played';
+    cues.forEach((c, k) => {
+      if (k < i)        c.state = 'played';
+      else if (k === i) c.state = 'next';
+      else              c.state = 'pending';
+    });
+    showToast('Saut → Cue ' + (i + 1));
+    renderCueList();
+  }
+
+  // ════════════════════════════════════════════════
+  // MODE ÉDITION
+  // ════════════════════════════════════════════════
+  function toggleEditMode() {
+    editMode = !editMode;
+    confirmDeleteId = null;
+    const btn = document.getElementById('btnEditMode');
+    const colSeq = document.querySelector('.col-seq');
+    if (editMode) {
+      btn.textContent = '✓ Terminer';
+      btn.classList.add('active');
+      colSeq.classList.add('edit-mode-active');
+    } else {
+      btn.textContent = '✏ Éditer';
+      btn.classList.remove('active');
+      colSeq.classList.remove('edit-mode-active');
+    }
+    renderCueList();
+  }
+
+  function addSection() {
+    const name = prompt('Nom de la section :', 'Acte 1');
+    if (!name) return;
+    const id = 'section_' + Date.now();
+    cues.push({ id, type: 'section', name: name.trim(), collapsed: false });
+    autoSave();
+    renderCueList();
+  }
+
+  function renameSection(section) {
+    const name = prompt('Renommer la section :', section.name);
+    if (!name || name.trim() === section.name) return;
+    section.name = name.trim();
+    autoSave();
+    renderCueList();
+  }
+
+  function openEditCue(cueId) {
+    editingCueId = cueId;
+    const cue = cues.find(c => c.id === cueId);
+    if (!cue) return;
+
+    document.getElementById('modalTitle').textContent = 'Modifier le cue';
+    document.getElementById('fieldName').value    = cue.name;
+    document.getElementById('fieldType').value    = cue.type;
+    document.getElementById('fieldVol').value     = Math.round(cue.vol * 100);
+    document.getElementById('fieldFadeIn').value  = cue.fadeIn;
+    document.getElementById('fieldFadeOut').value = cue.fadeOut;
+    document.getElementById('fieldStartAt').value = cue.startAt > 0 ? secToMmss(cue.startAt) : '';
+    document.getElementById('fieldEndAt').value   = cue.endAt
+      ? (cue.endAt < 0 ? String(cue.endAt) : secToMmss(cue.endAt)) : '';
+    document.getElementById('fieldLoop').checked  = !!(cue.loop ?? (cue.type === 'loop'));
+    document.getElementById('fieldNotes').value   = cue.notes;
+    document.getElementById('fieldStartAtRow').style.display = '';
+    document.getElementById('fieldEndAtRow').style.display   = '';
+    document.getElementById('fieldLoopRow').style.display    = '';
+    const curFile = document.getElementById('fieldCurrentFile');
+    if (cue.dbKey) {
+      curFile.textContent = '📎 ' + cue.dbKey;
+      curFile.style.display = '';
+    } else {
+      curFile.style.display = 'none';
+    }
+    document.getElementById('btnModalAdd').textContent = 'Sauvegarder';
+    modalTarget = 'seq';
+    document.getElementById('addModal').classList.add('open');
+  }
+
+  function toggleHideCue(cueId) {
+    const cue = cues.find(c => c.id === cueId);
+    if (!cue) return;
+    cue.hidden = !cue.hidden;
+    // Un cue masqué ne peut pas être "next" ou "playing"
+    if (cue.hidden && (cue.state === 'next' || cue.state === 'playing')) {
+      cue.state = 'pending';
+      // Trouver le prochain cue visible et le marquer "next"
+      const nextVisible = cues.find(c => !c.hidden && c.state === 'pending');
+      if (nextVisible) nextVisible.state = 'next';
+    }
+    renderCueList();
+    autoSave();
+  }
+
+  function requestDeleteCue(cueId) {
+    confirmDeleteId = cueId;
+    renderCueList(); // ré-affiche avec la confirmation inline
+  }
+
+  function confirmDelete(cueId) {
+    const idx = cues.findIndex(c => c.id === cueId);
+    if (idx < 0) return;
+    const name = cues[idx].name;
+    // Si ce cue était "next", passer le suivant visible en "next"
+    if (cues[idx].state === 'next') {
+      const nextVisible = cues.find((c, i) => i > idx && !c.hidden && c.state === 'pending');
+      if (nextVisible) nextVisible.state = 'next';
+    }
+    cues.splice(idx, 1);
+    confirmDeleteId = null;
+    showToast('🗑 "' + name + '" supprimé');
+    renderCueList();
+    autoSave();
+  }
+
+  function cancelDelete() {
+    confirmDeleteId = null;
+    renderCueList();
+  }
+
+  function moveCue(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= cues.length) return;
+    [cues[i], cues[j]] = [cues[j], cues[i]];
+    renderCueList();
+    autoSave();
+  }
+
+  // Volume master
+  document.getElementById('masterVolume').addEventListener('input', function() {
+    document.getElementById('volVal').textContent = this.value + '%';
+    _applyVolume();
+  });
+
+  // ════════════════════════════════════════════════
+  // PADS
+  // ════════════════════════════════════════════════
+  function triggerPad(pad) {
+    engine.ensureCtx();
+    requestWakeLock();
+
+    if (currentPad?.id === pad.id && !engine.isPaused()) {
+      // Stop du pad en cours
+      stopAll();
+      showToast('■ ' + pad.name);
+      renderCueList();
+      renderPads();
+      return;
+    }
+
+    stopAll();
+    currentPad = pad;
+    currentCue = null;
+
+    updateNpBar('playing', pad.name);
+
+    const hasAudio = engine.play(pad.id, {
+      vol:    pad.vol,
+      fadeIn: 0,
+      fadeOut: 1,
+      offset: 0,
+      loop:   pad.type === 'loop',
+    }, () => {
+      currentPad = null;
+      updateNpBar('idle');
+      renderPads();
+    });
+
+    if (!hasAudio) showToast('⚠ Aucun fichier audio pour : ' + pad.name);
+    else showToast('▶ ' + pad.name);
+
+    renderCueList();
+    renderPads();
+  }
+
+  // ════════════════════════════════════════════════
+  // RENDU
+  // ════════════════════════════════════════════════
+  function renderCueList() {
+    const list = document.getElementById('cueList');
+    list.innerHTML = '';
+
+    let sectionCollapsed = false;
+    let cuePosNum = 0; // numéro séquentiel ignorant les sections
+
+    cues.forEach((cue, i) => {
+
+      // ── SÉPARATEUR DE SECTION ──
+      if (cue.type === 'section') {
+        sectionCollapsed = !!cue.collapsed;
+        const sep = document.createElement('div');
+        sep.className = 'section-sep' + (sectionCollapsed ? ' collapsed' : '');
+        sep.dataset.id = cue.id;
+
+        // Compter les cues de la section (jusqu'à la suivante)
+        let sectionCueCount = 0;
+        for (let j = i + 1; j < cues.length && cues[j].type !== 'section'; j++) sectionCueCount++;
+
+        if (editMode) {
+          sep.innerHTML = `
+            <span class="section-chevron">▾</span>
+            <span class="section-title" id="st_${cue.id}">${cue.name}</span>
+            <div class="section-line"></div>
+            <div class="section-edit-actions">
+              <button class="ea-btn ea-up"   title="Monter">↑</button>
+              <button class="ea-btn ea-down" title="Descendre">↓</button>
+              <button class="ea-btn ea-edit" title="Renommer">✏</button>
+              <button class="ea-btn ea-delete" title="Supprimer">✕</button>
+            </div>`;
+          sep.querySelector('.ea-up').addEventListener('click',     e => { e.stopPropagation(); moveCue(i, -1); });
+          sep.querySelector('.ea-down').addEventListener('click',   e => { e.stopPropagation(); moveCue(i, +1); });
+          sep.querySelector('.ea-edit').addEventListener('click',   e => { e.stopPropagation(); renameSection(cue); });
+          sep.querySelector('.ea-delete').addEventListener('click', e => { e.stopPropagation(); cues.splice(i, 1); autoSave(); renderCueList(); });
+        } else {
+          sep.innerHTML = `
+            <span class="section-chevron">▾</span>
+            <span class="section-title">${cue.name}</span>
+            <div class="section-line"></div>
+            ${sectionCollapsed ? `<span class="section-count">${sectionCueCount} cue${sectionCueCount > 1 ? 's' : ''}</span>` : ''}`;
+          sep.addEventListener('click', () => {
+            cue.collapsed = !cue.collapsed;
+            autoSave();
+            renderCueList();
+          });
+        }
+        list.appendChild(sep);
+        return;
+      }
+
+      // ── CUE MASQUÉ PAR SECTION RÉDUITE ──
+      if (sectionCollapsed) return;
+
+      cuePosNum++;
+      const isActive  = cue.state === 'playing';
+      const isNext    = cue.state === 'next';
+      const isPlayed  = cue.state === 'played';
+      const isHidden  = !!cue.hidden;
+      const hasFile   = engine.hasBuffer(cue.id);
+      const dur       = engine.getDuration(cue.id);
+      const isPendingDelete = confirmDeleteId === cue.id;
+
+      const item = document.createElement('div');
+      item.className = 'cue-item'
+        + (isActive ? ' active' : '')
+        + (isNext   ? ' next'   : '')
+        + (isPlayed ? ' played' : '')
+        + (isHidden ? ' hidden-cue' : '');
+
+      const startLabel = cue.startAt > 0 ? `↦ ${secToMmss(cue.startAt)}` : '';
+      const endLabel   = cue.endAt   ? (cue.endAt < 0 ? `↤ -${Math.abs(cue.endAt)}s` : `↤ ${secToMmss(cue.endAt)}`) : '';
+      const fileDot    = hasFile
+        ? `<span class="has-file-dot" title="Fichier chargé">●</span>`
+        : `<span class="no-file-dot" title="Aucun fichier">○</span>`;
+      const isLoop     = cue.loop ?? (cue.type === 'loop');
+      const durLabel   = isLoop ? '∞' : (dur ? secToMmss(dur) : '—');
+
+      if (editMode) {
+        if (isPendingDelete) {
+          item.innerHTML = `
+            <div class="cue-number">${String(cuePosNum).padStart(2,'0')}</div>
+            <div class="cue-info">
+              <div class="cue-name delete-text">Supprimer "${cue.name}" ?</div>
+            </div>
+            <div class="delete-confirm">
+              <span class="dc-label">Confirmer ?</span>
+              <button class="dc-yes">Oui</button>
+              <button class="dc-no">Non</button>
+            </div>`;
+          item.querySelector('.dc-yes').addEventListener('click', e => { e.stopPropagation(); confirmDelete(cue.id); });
+          item.querySelector('.dc-no').addEventListener('click',  e => { e.stopPropagation(); cancelDelete(); });
+        } else {
+          item.innerHTML = `
+            <div class="cue-number">${String(cuePosNum).padStart(2,'0')}</div>
+            <div class="cue-info">
+              <div class="cue-name">${cue.name}</div>
+              <div class="cue-meta">
+                ${fileDot}
+                <span class="cue-tag tag-${cue.type}">${typeEmojis[cue.type]} ${cue.type}</span>
+                ${startLabel ? `<span class="start-at-badge">${startLabel}</span>` : ''}
+                ${endLabel   ? `<span class="start-at-badge">${endLabel}</span>`   : ''}
+              </div>
+            </div>
+            <div class="edit-actions">
+              <button class="ea-btn ea-up"   title="Monter">↑</button>
+              <button class="ea-btn ea-down" title="Descendre">↓</button>
+              <button class="ea-btn ea-edit"   title="Modifier">✏</button>
+              <button class="ea-btn ea-hide ${isHidden ? 'is-hidden' : ''}" title="${isHidden ? 'Afficher' : 'Masquer'}">${isHidden ? '👁‍🗨' : '👁'}</button>
+              <button class="ea-btn ea-delete" title="Supprimer">✕</button>
+            </div>`;
+          item.querySelector('.ea-up').addEventListener('click',     e => { e.stopPropagation(); moveCue(i, -1); });
+          item.querySelector('.ea-down').addEventListener('click',   e => { e.stopPropagation(); moveCue(i, +1); });
+          item.querySelector('.ea-edit').addEventListener('click',   e => { e.stopPropagation(); openEditCue(cue.id); });
+          item.querySelector('.ea-hide').addEventListener('click',   e => { e.stopPropagation(); toggleHideCue(cue.id); });
+          item.querySelector('.ea-delete').addEventListener('click', e => { e.stopPropagation(); requestDeleteCue(cue.id); });
+        }
+      } else {
+        const isPlaying = currentCue?.id === cue.id && engine.isPlaying(cue.id);
+        const isPaused  = currentCue?.id === cue.id && engine.isPaused();
+        if (isPaused) item.classList.add('paused');
+        const loopOn = !!cue.loop;
+
+        const playBtn  = isPlaying ? '' : `<button class="ct-btn ct-play" title="Lecture">▶</button>`;
+        const pauseBtn = (isPlaying || isPaused)
+          ? `<button class="ct-btn ct-pause" title="${isPaused ? 'Reprendre' : 'Pause'}">${isPaused ? '▶' : '⏸'}</button>` : '';
+        const stopBtn  = (isPlaying || isPaused)
+          ? `<button class="ct-btn ct-stop" title="Stop">■</button>` : '';
+        const nextBtn  = `<button class="ct-btn ct-next" title="Marquer comme suivant">»</button>`;
+
+        item.innerHTML = `
+          <div class="cue-number">${String(cuePosNum).padStart(2,'0')}</div>
+          <div class="cue-info">
+            <div class="cue-name">${cue.name}</div>
+            <div class="cue-meta">
+              ${fileDot}
+              <span class="cue-tag tag-${cue.type}">${typeEmojis[cue.type]} ${cue.type}</span>
+              ${startLabel ? `<span class="start-at-badge">${startLabel}</span>` : ''}
+              ${loopOn ? `<span class="loop-badge">🔁 loop</span>` : ''}
+              <span>${cue.notes}</span>
+            </div>
+          </div>
+          <div class="cue-duration">${durLabel}</div>
+          <button class="loop-toggle ${loopOn ? 'on' : ''}" title="Boucle">🔁</button>
+          <div class="cue-transport">${playBtn}${pauseBtn}${stopBtn}${nextBtn}</div>`;
+
+        item.querySelector('.loop-toggle').addEventListener('click', e => {
+          e.stopPropagation(); cue.loop = !cue.loop; renderCueList(); autoSave();
+        });
+        item.addEventListener('click', () => playDirectCue(cue));
+        item.querySelector('.ct-next').addEventListener('click', e => { e.stopPropagation(); jumpToCue(i); });
+        item.querySelector('.ct-play')?.addEventListener('click',  e => { e.stopPropagation(); playDirectCue(cue); });
+        item.querySelector('.ct-pause')?.addEventListener('click', e => {
+          e.stopPropagation(); if (isPaused) playDirectCue(cue); else handlePause();
+        });
+        item.querySelector('.ct-stop')?.addEventListener('click',  e => {
+          e.stopPropagation(); stopAll();
+          cue.state = 'pending'; delete cue._prevState;
+          currentCue = null; renderCueList(); renderPads();
+        });
+      }
+
+      list.appendChild(item);
+    });
+
+    const audioCueCount = cues.filter(c => c.type !== 'section').length;
+    document.getElementById('cueCount').textContent = audioCueCount;
+    updateGoButton();
+
+    const active = list.querySelector('.active, .next');
+    if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function updateGoButton() { /* bouton GO supprimé */ }
+
+  function renderPads() {
+    const grid = document.getElementById('padsGrid');
+    grid.innerHTML = '';
+
+    const groups = { fx:[], music:[], ambiance:[], loop:[] };
+    pads.forEach(p => { if (groups[p.type]) groups[p.type].push(p); });
+
+    const groupLabels = { fx:'💥 Effets', music:'🎵 Musiques', ambiance:'🌿 Ambiances', loop:'🔁 Boucles' };
+
+    Object.entries(groups).forEach(([type, items]) => {
+      if (!items.length) return;
+      const lbl = document.createElement('div');
+      lbl.className = 'pads-section-label';
+      lbl.textContent = groupLabels[type];
+      grid.appendChild(lbl);
+
+      items.forEach(pad => {
+        const isActive = currentPad?.id === pad.id;
+        const hasFile  = engine.hasBuffer(pad.id);
+        const btn = document.createElement('button');
+        btn.className = 'pad-btn' + (isActive ? ' playing' : '');
+        btn.dataset.type = pad.type;
+        btn.innerHTML = `
+          <div class="pad-emoji">${pad.emoji}</div>
+          <div class="pad-name">${pad.name}</div>
+          <div class="pad-vol">${hasFile ? Math.round(pad.vol*100)+'%' : '<span style="color:var(--text-muted);font-size:9px">pas de fichier</span>'}</div>
+        `;
+        btn.addEventListener('click', () => triggerPad(pad));
+        if (editMode) {
+          btn.querySelector('.pad-emoji').addEventListener('click', (e) => {
+            e.stopPropagation();
+            openEmojiPicker(pad, btn.querySelector('.pad-emoji'));
+          });
+          const delBtn = document.createElement('button');
+          delBtn.className = 'pad-delete';
+          delBtn.textContent = '✕';
+          delBtn.title = 'Supprimer';
+          delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (currentPad?.id === pad.id) stopAll();
+            engine.clearBuffer?.(pad.id);
+            pads.splice(pads.indexOf(pad), 1);
+            autoSave();
+            renderPads();
+          });
+          btn.appendChild(delBtn);
+        } else {
+          btn.querySelector('.pad-emoji').style.cursor = 'default';
+        }
+        grid.appendChild(btn);
+      });
+    });
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'pad-add';
+    addBtn.textContent = '+';
+    addBtn.addEventListener('click', () => openAddModal('pad'));
+    grid.appendChild(addBtn);
+
+    document.getElementById('padCount').textContent = pads.length;
+  }
+
+  // ════════════════════════════════════════════════
+  // MODAL — Création cue / pad avec chargement audio
+  // ════════════════════════════════════════════════
+  function openAddModal(target) {
+    modalTarget = target;
+    document.getElementById('modalTitle').textContent =
+      target === 'seq' ? 'Nouveau cue séquentiel' : 'Nouveau son libre';
+    document.getElementById('fieldStartAtRow').style.display = target === 'seq' ? '' : 'none';
+    document.getElementById('fieldEndAtRow').style.display   = target === 'seq' ? '' : 'none';
+    document.getElementById('fieldLoopRow').style.display    = target === 'seq' ? '' : 'none';
+    document.getElementById('fieldLoop').checked = false;
+    document.getElementById('fieldCurrentFile').style.display = 'none';
+    document.getElementById('addModal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('addModal').classList.remove('open');
+    editingCueId = null;
+    document.getElementById('btnModalAdd').textContent = 'Ajouter';
+    document.getElementById('modalTitle').textContent = 'Nouveau cue';
+  }
+
+  document.getElementById('addModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  async function submitModal() {
+    const name = document.getElementById('fieldName').value.trim();
+    if (!name) { showToast('⚠ Nom requis'); return; }
+
+    const type    = document.getElementById('fieldType').value;
+    const vol     = (parseInt(document.getElementById('fieldVol').value) || 80) / 100;
+    const fadeIn  = parseFloat(document.getElementById('fieldFadeIn').value)  || 0;
+    const fadeOut = parseFloat(document.getElementById('fieldFadeOut').value) || 0;
+    const notes   = document.getElementById('fieldNotes').value.trim();
+    const fileInput = document.getElementById('fieldFile');
+    const file    = fileInput.files[0] || null;
+
+    const btn = document.getElementById('btnModalAdd');
+    btn.textContent = 'Chargement…';
+    btn.disabled = true;
+
+    if (modalTarget === 'seq') {
+      const startAt = mmssToSec(document.getElementById('fieldStartAt').value.trim());
+      const endAt   = parseEndAt(document.getElementById('fieldEndAt').value);
+      const loop    = document.getElementById('fieldLoop').checked;
+
+      if (editingCueId !== null) {
+        // ── Mise à jour d'un cue existant ──
+        const cue = cues.find(c => c.id === editingCueId);
+        if (cue) {
+          cue.name    = name;
+          cue.type    = type;
+          cue.vol     = vol;
+          cue.fadeIn  = fadeIn;
+          cue.fadeOut = fadeOut;
+          cue.startAt = startAt;
+          cue.endAt   = endAt;
+          cue.loop    = loop;
+          cue.notes   = notes;
+          if (file) {
+            try {
+              await engine.loadFile(cue.id, file, file.name);
+              cue.dbKey = file.name;
+            } catch(e) { showToast('⚠ ' + e.message); }
+          }
+          showToast('✓ Cue mis à jour');
+        }
+        editingCueId = null;
+      } else {
+        // ── Création d'un nouveau cue ──
+        const id = Date.now();
+        const newCue = { id, name, type, vol, fadeIn, fadeOut, startAt, endAt, loop, notes, state: 'pending' };
+        if (file) newCue.dbKey = file.name;
+        cues.push(newCue);
+        if (file) {
+          try {
+            await engine.loadFile(id, file, file.name);
+            showToast('✓ "' + name + '" — fichier chargé');
+          } catch(e) {
+            showToast('⚠ Erreur décodage : ' + e.message);
+          }
+        } else {
+          showToast('✓ "' + name + '" ajouté (sans fichier)');
+        }
+      }
+
+      document.getElementById('fieldStartAt').value = '';
+      document.getElementById('fieldEndAt').value   = '';
+      document.getElementById('btnModalAdd').textContent = 'Ajouter';
+      renderCueList();
+      autoSave();
+    } else {
+      const id = 'p' + Date.now();
+      const newPad = { id, name, type, vol, emoji: file ? guessEmoji(file.name) : typeEmojis[type] };
+      if (file) newPad.dbKey = file.name;
+      pads.push(newPad);
+      if (file) {
+        try {
+          await engine.loadFile(id, file, file.name);
+          showToast('✓ "' + name + '" — fichier chargé');
+        } catch(e) {
+          showToast('⚠ Erreur décodage : ' + e.message);
+        }
+      } else {
+        showToast('✓ "' + name + '" ajouté (sans fichier)');
+      }
+      renderPads();
+      autoSave();
+    }
+
+    btn.textContent = 'Ajouter';
+    btn.disabled = false;
+    closeModal();
+    ['fieldName','fieldNotes'].forEach(id => document.getElementById(id).value = '');
+    fileInput.value = '';
+  }
+
+  // ════════════════════════════════════════════════
+  // TOAST
+  // ════════════════════════════════════════════════
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  // ════════════════════════════════════════════════
+  // IMPORT DOSSIER
+  // ════════════════════════════════════════════════
+  let importFiles   = []; // File[] en attente
+  let importDest    = 'seq';
+
+  // ════════════════════════════════════════════════
+  // EMOJI — auto-détection et picker
+  // ════════════════════════════════════════════════
+
+  const EMOJI_KEYWORDS = [
+    // Nature / météo
+    ['🌧', ['pluie','rain','orage','storm','drizzle','averse']],
+    ['⛈',  ['thunder','tonnerre','foudre','lightning']],
+    ['🌬', ['vent','wind','brise','breeze','rafale','gust']],
+    ['❄️', ['neige','snow','blizzard','glace','ice','givre']],
+    ['🌊', ['vague','wave','mer','sea','ocean','fleuve','rivière']],
+    ['🔥', ['feu','fire','flamme','flame','braise','incendie']],
+    ['🌲', ['forêt','forest','bois','arbre','tree','jungle','foret']],
+    ['🌿', ['herbe','grass','feuille','leaf','buisson','bush','nature']],
+    ['🌸', ['fleur','flower','printemps','spring']],
+    ['🌙', ['nuit','night','lune','moon']],
+    ['☀️', ['soleil','sun','jour','day']],
+    ['🌫',  ['brouillard','fog','brume','mist']],
+    // Ambiances urbaines
+    ['🚗', ['voiture','car','auto','traffic','circulation','route']],
+    ['🚂', ['train','gare','rail','locomotive','métro','subway']],
+    ['✈️', ['avion','plane','airport','aéroport','vol','flight']],
+    ['🚢', ['bateau','boat','ship','navire','port']],
+    ['🏙', ['ville','city','urban','rue','street','crowd','foule']],
+    ['🚨', ['sirène','sirene','alarm','alerte','police','ambulance','urgence']],
+    ['🔔', ['cloche','bell','sonnerie','ring','carillon']],
+    ['📯', ['corne','horn','klaxon','trompette']],
+    // Humains / action
+    ['👏', ['applaudissements','applause','clap','bravo','ovation']],
+    ['👣', ['pas','step','footstep','marche','walk','course','run']],
+    ['🗣', ['voix','voice','parole','speech','foule','crowd','murmure']],
+    ['😂', ['rire','laugh','rires']],
+    ['😢', ['pleur','cry','sanglot','sobs']],
+    ['😱', ['cri','scream','hurlement','shriek']],
+    // Musique / sons électroniques
+    ['🎵', ['musique','music','chanson','song','mélodie','melody','piano','guitare','guitar']],
+    ['🥁', ['tambour','drum','batterie','percussion']],
+    ['🎺', ['trompette','trumpet','cuivre','brass']],
+    ['🎻', ['violon','violin','orchestre','orchestra','cordes']],
+    ['🎸', ['guitare','guitar','basse','bass','rock']],
+    ['🎹', ['piano','clavier','keyboard','orgue','organ']],
+    ['🔊', ['son','sound','bip','beep','signal','électronique','electronic']],
+    ['⚡', ['électrique','electric','zap','choc','shock']],
+    ['💥', ['explosion','boom','impact','choc','blast','bang']],
+    ['🔫', ['coup de feu','shot','gun','tir']],
+    ['⚔️', ['combat','fight','bataille','battle','épée','sword']],
+    ['🕰',  ['horloge','clock','tic','tac','tick']],
+    ['🌊', ['eau','water','ruisseau','stream','fontaine','fountain']],
+    ['🐦', ['oiseau','bird','chant','tweet','pigeon','coucou']],
+    ['🐺', ['loup','wolf','hurlement']],
+    ['🦗', ['grillon','cricket','insecte','insect']],
+    ['🐸', ['grenouille','frog']],
+    ['🌃', ['ambiance','atmosphere','atmosphère','générique','générale','intro','fin','end']],
+  ];
+
+  function guessEmoji(filename) {
+    const lower = filename.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    for (const [emoji, keywords] of EMOJI_KEYWORDS) {
+      for (const kw of keywords) {
+        const kwNorm = kw.normalize('NFD').replace(/[̀-ͯ]/g, '');
+        if (lower.includes(kwNorm)) return emoji;
+      }
+    }
+    return '🎵';
+  }
+
+  // Liste d'emojis disponibles dans le picker
+  const EMOJI_PICKER_LIST = [
+    '🎵','🎶','🎸','🎹','🎺','🎻','🥁','🎷',
+    '👏','😂','😱','😢','🗣','👣',
+    '💥','⚡','🔫','⚔️','💣','🔥',
+    '🌧','⛈','🌬','❄️','☀️','🌙','🌫','🌊','🌈',
+    '🌲','🌿','🌸','🍃','🍂',
+    '🐦','🐺','🦗','🐸','🦁','🐘',
+    '🚗','🚂','✈️','🚢','🚨','🔔','📯','🕰',
+    '🏙','🌃','🎭','🎬','🎪',
+    '🔊','📻','📡','⚙️',
+  ];
+
+  let emojiPickerTarget = null; // { pad, btn }
+
+  function openEmojiPicker(pad, emojiEl) {
+    closeEmojiPicker();
+    emojiPickerTarget = { pad, el: emojiEl };
+
+    const picker = document.createElement('div');
+    picker.id = 'emojiPicker';
+    picker.style.cssText = `
+      position: fixed; z-index: 900;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px; display: flex; flex-wrap: wrap;
+      gap: 4px; max-width: 260px; box-shadow: 0 8px 24px var(--shadow);
+    `;
+    EMOJI_PICKER_LIST.forEach(e => {
+      const btn = document.createElement('button');
+      btn.textContent = e;
+      btn.style.cssText = 'background:none;border:1px solid transparent;border-radius:6px;font-size:24px;padding:4px;cursor:pointer;line-height:1;';
+      btn.addEventListener('mouseenter', () => btn.style.borderColor = 'var(--accent)');
+      btn.addEventListener('mouseleave', () => btn.style.borderColor = 'transparent');
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        pad.emoji = e;
+        closeEmojiPicker();
+        renderPads();
+      });
+      picker.appendChild(btn);
+    });
+
+    // Position sous l'élément emoji
+    const rect = emojiEl.getBoundingClientRect();
+    picker.style.top  = (rect.bottom + 6) + 'px';
+    picker.style.left = Math.min(rect.left, window.innerWidth - 280) + 'px';
+
+    document.body.appendChild(picker);
+    setTimeout(() => document.addEventListener('click', closeEmojiPicker, { once: true }), 0);
+  }
+
+  function closeEmojiPicker() {
+    document.getElementById('emojiPicker')?.remove();
+    emojiPickerTarget = null;
+  }
+
+  function cleanFileName(name) {
+    return name
+      .replace(/\.(mp3|wav|ogg|m4a|aac|flac)$/i, '')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+(copie|\d+)$/i, '')   // retire " copie", " 2", " 3"…
+      .replace(/\(remastered\)/i, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^\w/, c => c.toUpperCase());
+  }
+
+  function formatBytes(b) {
+    return b > 1048576 ? (b/1048576).toFixed(1)+' Mo' : Math.round(b/1024)+' Ko';
+  }
+
+  async function openFolderImport() {
+    importFiles = [];
+    let files = [];
+
+    // Tentative File System Access API (Chrome desktop)
+    if (window.showDirectoryPicker) {
+      try {
+        const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name)) {
+            files.push(await entry.getFile());
+          }
+        }
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          // Fallback input
+          document.getElementById('folderFileInput').click();
+          return;
+        }
+        return;
+      }
+    } else {
+      document.getElementById('folderFileInput').click();
+      return;
+    }
+
+    if (!files.length) { showToast('Aucun fichier audio trouvé'); return; }
+    _showImportDialog(files);
+  }
+
+  // Fallback : input webkitdirectory
+  document.getElementById('folderFileInput').addEventListener('change', function() {
+    const files = Array.from(this.files).filter(f => /\.(mp3|wav|ogg|m4a|aac)$/i.test(f.name));
+    this.value = '';
+    if (!files.length) { showToast('Aucun fichier audio'); return; }
+    _showImportDialog(files);
+  });
+
+  function _showImportDialog(files) {
+    // Trier alphabétiquement
+    importFiles = files.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    const list = document.getElementById('importFileList');
+    list.innerHTML = '';
+    importFiles.forEach((f, i) => {
+      const div = document.createElement('div');
+      div.className = 'import-file-item';
+      div.innerHTML = `
+        <div class="ifc"><input type="checkbox" id="ifc${i}" checked></div>
+        <label class="if-name" for="ifc${i}">${cleanFileName(f.name)}</label>
+        <span class="if-size">${formatBytes(f.size)}</span>
+      `;
+      list.appendChild(div);
+    });
+    document.getElementById('importProgressFill').style.width = '0%';
+    document.getElementById('importProgressText').textContent = '';
+    document.getElementById('btnImportConfirm').disabled = false;
+    document.getElementById('btnImportConfirm').textContent = 'Importer';
+    document.getElementById('importOverlay').classList.add('open');
+  }
+
+  function toggleSelectAll() {
+    const boxes  = document.querySelectorAll('#importFileList input[type=checkbox]');
+    const allOn  = Array.from(boxes).every(b => b.checked);
+    boxes.forEach(b => b.checked = !allOn);
+    document.getElementById('importSelectAll').textContent = allOn ? 'Tout sélectionner' : 'Tout désélectionner';
+  }
+
+  function selectDest(dest) {
+    importDest = dest;
+    document.getElementById('destSeq').classList.toggle('selected', dest === 'seq');
+    document.getElementById('destPad').classList.toggle('selected', dest === 'pad');
+  }
+
+  function closeImport() {
+    document.getElementById('importOverlay').classList.remove('open');
+    importFiles = [];
+  }
+
+  async function confirmImport() {
+    const boxes    = document.querySelectorAll('#importFileList input[type=checkbox]');
+    const selected = importFiles.filter((_, i) => boxes[i]?.checked);
+    if (!selected.length) { showToast('Aucun fichier sélectionné'); return; }
+
+    const btn  = document.getElementById('btnImportConfirm');
+    const fill = document.getElementById('importProgressFill');
+    const txt  = document.getElementById('importProgressText');
+    btn.disabled = true;
+
+    engine.ensureCtx();
+    let done = 0;
+
+    for (const file of selected) {
+      const name = cleanFileName(file.name);
+      txt.textContent = `Chargement : ${name}…`;
+      const id = 'folder_' + Date.now() + '_' + done;
+      try {
+        await engine.loadFile(id, file, file.name); // sauvegarde dans IDB sous file.name
+        if (importDest === 'seq') {
+          const isFirst = !cues.some(c => c.state === 'next');
+          cues.push({
+            id, name, type: 'music', vol: 0.80,
+            fadeIn: 1, fadeOut: 2, startAt: 0, notes: '',
+            state: isFirst ? 'next' : 'pending',
+            dbKey: file.name,   // clé IDB pour retrouver le fichier après rechargement projet
+          });
+        } else {
+          pads.push({ id, name, type: 'music', vol: 0.80, emoji: guessEmoji(file.name), dbKey: file.name });
+        }
+      } catch(e) {
+        showToast('⚠ Erreur : ' + name);
+      }
+      done++;
+      fill.style.width = (done / selected.length * 100).toFixed(0) + '%';
+      renderCueList();
+      renderPads();
+    }
+
+    txt.textContent = `✓ ${done} fichier${done > 1 ? 's' : ''} importé${done > 1 ? 's' : ''}`;
+    btn.textContent = 'Terminé';
+    showToast(`✓ ${done} sons ajoutés en ${importDest === 'seq' ? 'séquence' : 'sons libres'}`);
+    autoSave();
+    setTimeout(closeImport, 1200);
+  }
+
+  // ════════════════════════════════════════════════
+  // PRÉCHARGEMENT DES SONS
+  // Stratégie : IDB (cache local) → fetch → manquant
+  // Fonctionne sans serveur si les sons sont en cache.
+  // ════════════════════════════════════════════════
+  async function preloadAllSounds() {
+    const banner     = document.getElementById('loadBanner');
+    const bannerText = document.getElementById('loadBannerText');
+    banner.classList.remove('hidden');
+    bannerText.textContent = 'Chargement des sons…';
+
+    // Construire la liste d'items à charger (url ou dbKey)
+    const allItems = [
+      ...cues.filter(c => c.type !== 'section').map(c => ({ id: c.id, url: c.url ?? null, dbKey: c.dbKey ?? (c.url ? c.url.split('/').pop() : null), name: c.name })),
+      ...pads.map(p => ({ id: p.id, url: p.url ?? null, dbKey: p.dbKey ?? (p.url ? p.url.split('/').pop() : null), name: p.name })),
+    ].filter(x => x.dbKey || x.url);
+
+    // Déduplication : une seule tentative par dbKey
+    const seen = new Set();
+    const unique = allItems.filter(x => {
+      const k = x.dbKey ?? x.url;
+      return seen.has(k) ? false : (seen.add(k), true);
+    });
+
+    let loaded = 0, fromCache = 0, missing = [];
+
+    await Promise.allSettled(unique.map(async item => {
+      const key = item.dbKey;
+      try {
+        // 1. Essai depuis IDB (cache) — fonctionne même sans URL
+        await engine.loadFromIDB(item.id, key);
+        fromCache++;
+      } catch (_) {
+        if (!item.url) {
+          // Pas d'URL de fallback : fichier importé depuis dossier, introuvable sans import
+          missing.push({ ...item });
+          return;
+        }
+        try {
+          // 2. Essai fetch (nécessite serveur ou HTTPS)
+          await engine.loadUrl(item.id, item.url);
+        } catch (_2) {
+          // 3. Manquant — sera chargé manuellement
+          missing.push({ ...item });
+          return;
+        }
+      }
+      // Propager aux doublons (même dbKey, id différent)
+      allItems.filter(x => (x.dbKey ?? x.url) === (item.dbKey ?? item.url) && x.id !== item.id)
+              .forEach(dup => engine._copyBuffer(item.id, dup.id));
+      loaded++;
+      bannerText.textContent = `Sons… ${loaded + missing.length}/${unique.length}`;
+      renderCueList();
+      renderPads();
+    }));
+
+    renderCueList();
+    renderPads();
+    window._missingSounds = missing;
+
+    // Cues/pads sans aucune source (ni dbKey ni url) — jamais de fichier associé
+    const noSource = [
+      ...cues.filter(c => c.type !== 'section' && !c.dbKey && !c.url),
+      ...pads.filter(p => !p.dbKey && !p.url),
+    ];
+
+    if (missing.length === 0 && noSource.length === 0) {
+      const src = fromCache === unique.length ? ' (cache)' : '';
+      bannerText.textContent = `✓ ${loaded} sons chargés${src}`;
+      setTimeout(() => banner.classList.add('hidden'), 2000);
+    } else {
+      const missingNames = [
+        ...missing.map(m => m.name),
+        ...noSource.map(n => n.name),
+      ];
+      const total = missingNames.length;
+      const preview = missingNames.slice(0, 3).join(', ') + (total > 3 ? ` +${total - 3}` : '');
+      banner.innerHTML = `
+        <div class="load-dot" style="background:var(--red)"></div>
+        <span title="${missingNames.join('\n')}">
+          ${total} fichier${total>1?'s':''} manquant${total>1?'s':''} : <em>${preview}</em>
+        </span>
+        ${missing.length > 0 ? `
+        <button onclick="loadMissingSounds()" style="
+          background:var(--accent);color:var(--on-accent);border:none;border-radius:4px;
+          padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:6px;">
+          📂 Charger le dossier
+        </button>` : ''}
+        <button onclick="document.getElementById('loadBanner').classList.add('hidden')" style="
+          background:none;border:none;color:var(--text-muted);font-size:16px;
+          cursor:pointer;margin-left:auto;padding:0 4px;">✕</button>
+      `;
+    }
+  }
+
+  // Ouvre le sélecteur de dossier pour charger les sons manquants
+  async function loadMissingSounds() {
+    const missing = window._missingSounds || [];
+    if (!missing.length) return;
+
+    let files = [];
+    if (window.showDirectoryPicker) {
+      try {
+        const dir = await window.showDirectoryPicker({ mode: 'read' });
+        for await (const entry of dir.values()) {
+          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
+            files.push(await entry.getFile());
+        }
+      } catch(e) { if (e.name !== 'AbortError') document.getElementById('folderFileInput').click(); return; }
+    } else {
+      document.getElementById('folderFileInput').click();
+      return;
+    }
+
+    const banner     = document.getElementById('loadBanner');
+    const fileMap    = new Map(files.map(f => [f.name, f]));
+    let loaded = 0;
+
+    for (const item of missing) {
+      const file = fileMap.get(item.dbKey);
+      if (!file) continue;
+      try {
+        await engine.loadFile(item.id, file, item.dbKey);
+        allItems_propagate(item);
+        loaded++;
+      } catch(e) { /* son manquant — déjà signalé dans le bandeau */ }
+    }
+
+    window._missingSounds = missing.filter(m => !engine.hasBuffer(m.id));
+    banner.innerHTML = window._missingSounds.length === 0
+      ? `<div class="load-dot"></div><span>✓ Tous les sons chargés</span>`
+      : `<div class="load-dot" style="background:var(--red)"></div><span>${window._missingSounds.length} son(s) toujours manquant(s)</span>`;
+
+    if (!window._missingSounds.length) setTimeout(() => banner.classList.add('hidden'), 2000);
+    renderCueList();
+    renderPads();
+    showToast(`✓ ${loaded} son${loaded>1?'s':''} chargé${loaded>1?'s':''}`);
+  }
+
+  function allItems_propagate(item) {
+    const allItems = [
+      ...cues.map(c => ({ id: c.id, key: c.dbKey ?? (c.url ? c.url.split('/').pop() : null) })),
+      ...pads.map(p => ({ id: p.id, key: p.dbKey ?? (p.url ? p.url.split('/').pop() : null) })),
+    ];
+    allItems.filter(x => x.key && x.key === item.key && x.id !== item.id)
+            .forEach(dup => engine._copyBuffer(item.id, dup.id));
+  }
+
+  // ════════════════════════════════════════════════
+  // GESTION DES SPECTACLES (projets)
+  // ════════════════════════════════════════════════
+
+  function openProjectsModal() {
+    document.getElementById('projectsModal').classList.add('open');
+    refreshProjectsList();
+  }
+
+  function closeProjectsModal() {
+    document.getElementById('projectsModal').classList.remove('open');
+  }
+
+  function _buildProjectPayload(id, name) {
+    return {
+      id,
+      name,
+      savedAt: new Date().toISOString(),
+      cues: cues.map(c => ({ ...c, state: c.state === 'playing' ? 'pending' : c.state })),
+      pads: pads.map(p => ({ ...p })),
+    };
+  }
+
+  async function saveCurrentProject() {
+    const nameInput = document.getElementById('projectNameInput');
+    const name = nameInput.value.trim();
+    if (!name) { showToast('⚠ Saisir un nom de spectacle'); return; }
+
+    const id = name.toLowerCase().replace(/\s+/g, '-');
+    await projectsDB.saveProject(_buildProjectPayload(id, name));
+    currentProjectId   = id;
+    currentProjectName = name;
+    document.querySelector('.project-name').textContent = name;
+    nameInput.value = '';
+    showToast('💾 Spectacle sauvegardé : ' + name);
+    refreshProjectsList();
+  }
+
+  // Sauvegarde silencieuse du projet actif après chaque modification
+  async function autoSave() {
+    if (!currentProjectId) return;
+    await projectsDB.saveProject(_buildProjectPayload(currentProjectId, currentProjectName));
+    _flashSaveIndicator();
+  }
+
+  let _flashTimer = null;
+  function _flashSaveIndicator() {
+    const el = document.querySelector('.project-name');
+    el.textContent = currentProjectName + ' ✓';
+    clearTimeout(_flashTimer);
+    _flashTimer = setTimeout(() => { el.textContent = currentProjectName; }, 1500);
+  }
+
+  async function refreshProjectsList() {
+    const list = document.getElementById('projectsList');
+    const projects = await projectsDB.listProjects();
+    if (projects.length === 0) {
+      list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">Aucun spectacle sauvegardé</div>';
+      return;
+    }
+    projects.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    list.innerHTML = '';
+    projects.forEach(p => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;';
+      const date = new Date(p.savedAt).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      row.innerHTML = `
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</div>
+          <div style="font-size:11px;color:var(--text-muted);">${p.cues.length} cues · ${p.pads.length} pads · ${date}</div>
+        </div>
+        <button class="btn-primary" style="padding:5px 10px;font-size:12px;" data-id="${p.id}">📂 Charger</button>
+        <button class="btn-secondary btn-danger" style="padding:5px 8px;font-size:12px;" data-del="${p.id}">✕</button>
+      `;
+      row.querySelector('[data-id]').addEventListener('click', () => loadProject(p.id));
+      row.querySelector('[data-del]').addEventListener('click', () => deleteProject(p.id));
+      list.appendChild(row);
+    });
+  }
+
+  async function loadProject(id) {
+    const project = await projectsDB.loadProject(id);
+    if (!project) { showToast('⚠ Spectacle introuvable'); return; }
+
+    stopAll();
+    engine.clearBuffers(); // vide les anciens buffers avant de recharger
+
+    // Remplace les données en place
+    cues.length = 0;
+    project.cues.forEach(c => cues.push(c));
+    pads.length = 0;
+    project.pads.forEach(p => pads.push(p));
+
+    currentProjectId   = project.id;
+    currentProjectName = project.name;
+    document.querySelector('.project-name').textContent = project.name;
+    closeProjectsModal();
+    renderCueList();
+    renderPads();
+    showToast('📂 ' + project.name + ' — vérification des fichiers…');
+    await preloadAllSounds();
+  }
+
+  async function deleteProject(id) {
+    await projectsDB.deleteProject(id);
+    showToast('🗑 Spectacle supprimé');
+    refreshProjectsList();
+  }
+
+  // ════════════════════════════════════════════════
+  // PANNEAU THÈME
+  // ════════════════════════════════════════════════
+
+  const DEFAULT_THEME = {
+    '--bg': '#0f0f0f',
+    '--surface': '#1a1a1a',
+    '--surface2': '#242424',
+    '--border': '#2e2e2e',
+    '--accent': '#e8a020',
+    '--text': '#fafafa',
+    '--text-dim': '#aaaaaa',
+    '--text-muted': '#999999',
+    '--green': '#2ecc71',
+    '--green-dark': '#27ae60',
+    '--red': '#e74c3c',
+    '--red-dark': '#c0392b',
+    '--color-music': '#3498db',
+    '--color-fx': '#9b59b6',
+    '--color-ambiance': '#1abc9c',
+    '--color-loop': '#e67e22',
+  };
+
+  // Couleurs qui ont des variantes rgba dépendantes — recalculées à chaque changement
+  const RGBA_DEPS = {
+    '--accent':        [['--accent-bg',0.08],['--accent-bg2',0.12],['--accent-glow',0.2],['--accent-bg3',0.15]],
+    '--green':         [['--green-bg',0.05]],
+    '--red':           [['--red-bg',0.15]],
+    '--color-loop':    [['--loop-bg',0.2],['--loop-bg2',0.15],['--loop-border',0.3]],
+    '--color-music':   [['--music-bg',0.2],['--music-bg2',0.08]],
+    '--color-fx':      [['--fx-bg',0.2]],
+    '--color-ambiance':[['--ambiance-bg',0.2]],
+  };
+
+  function hexToRgb(hex) {
+    const c = hex.replace('#','');
+    const full = c.length === 3 ? c.split('').map(x=>x+x).join('') : c;
+    return [parseInt(full.slice(0,2),16), parseInt(full.slice(2,4),16), parseInt(full.slice(4,6),16)];
+  }
+
+  function applyThemeVar(varName, hex) {
+    document.documentElement.style.setProperty(varName, hex);
+    const deps = RGBA_DEPS[varName];
+    if (deps) {
+      const [r,g,b] = hexToRgb(hex);
+      deps.forEach(([dep, alpha]) => {
+        document.documentElement.style.setProperty(dep, `rgba(${r},${g},${b},${alpha})`);
+      });
+    }
+  }
+
+  function applyFullTheme(theme) {
+    Object.entries(theme).forEach(([k,v]) => applyThemeVar(k, v));
+  }
+
+  function saveTheme(theme) {
+    localStorage.setItem('impromusic-theme', JSON.stringify(theme));
+  }
+
+  function loadSavedTheme() {
+    try {
+      const saved = localStorage.getItem('impromusic-theme');
+      if (saved) applyFullTheme(JSON.parse(saved));
+    } catch(_) {}
+  }
+
+  function openThemePanel() {
+    _buildThemeRows();
+    document.getElementById('themePanel').classList.add('open');
+    document.getElementById('themeOverlay').classList.add('open');
+  }
+
+  function closeThemePanel() {
+    document.getElementById('themePanel').classList.remove('open');
+    document.getElementById('themeOverlay').classList.remove('open');
+  }
+
+  function resetTheme() {
+    applyFullTheme(DEFAULT_THEME);
+    localStorage.removeItem('impromusic-theme');
+    _buildThemeRows();
+    showToast('↺ Thème réinitialisé');
+  }
+
+  function _buildThemeRows() {
+    document.querySelectorAll('.theme-row[data-var]').forEach(row => {
+      const varName = row.dataset.var;
+      const label   = row.dataset.label;
+      const current = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+      // Convertit la valeur courante en hex pour le color picker
+      const hex = _cssColorToHex(current) ?? DEFAULT_THEME[varName] ?? '#ffffff';
+      row.innerHTML = `
+        <span class="theme-row-label">${label}</span>
+        <div class="theme-swatch" style="background:${hex}">
+          <input type="color" value="${hex}" data-var="${varName}">
+        </div>
+        <span class="theme-hex">${hex}</span>`;
+      row.querySelector('input').addEventListener('input', e => {
+        const v = e.target.value;
+        applyThemeVar(varName, v);
+        row.querySelector('.theme-swatch').style.background = v;
+        row.querySelector('.theme-hex').textContent = v;
+        // Sauvegarde toutes les valeurs courantes
+        const theme = {};
+        document.querySelectorAll('.theme-row[data-var]').forEach(r => {
+          const inp = r.querySelector('input[type="color"]');
+          if (inp) theme[r.dataset.var] = inp.value;
+        });
+        saveTheme(theme);
+      });
+    });
+  }
+
+  function _cssColorToHex(color) {
+    if (!color) return null;
+    color = color.trim();
+    if (color.startsWith('#')) {
+      if (color.length === 4) return '#' + color.slice(1).split('').map(c=>c+c).join('');
+      return color.slice(0,7);
+    }
+    // Pour les noms courts comme #aaa → déjà géré au-dessus
+    return null;
+  }
+
+  // Charge le thème sauvegardé au démarrage
+  loadSavedTheme();
+
+  // ── INIT ──
+  // Tente de recharger le dernier spectacle avant le premier rendu
+  // pour éviter le flash des cues hardcodés par défaut
+  (async () => {
+    const projects = await projectsDB.listProjects();
+    if (projects.length > 0) {
+      projects.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+      const last = projects[0];
+      cues.length = 0; last.cues.forEach(c => cues.push(c));
+      pads.length = 0; last.pads.forEach(p => pads.push(p));
+      currentProjectId   = last.id;
+      currentProjectName = last.name;
+      document.querySelector('.project-name').textContent = last.name;
+    }
+    renderCueList();
+    renderPads();
+    await preloadAllSounds();
+  })();
+</script>
+</body>
+</html>
