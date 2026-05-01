@@ -894,15 +894,16 @@
 
 <script>
   // ════════════════════════════════════════════════
-  // CACHE AUDIO — IndexedDB
-  // Stocke les ArrayBuffers bruts des MP3 sous leur
-  // nom de fichier (ex: "foret.mp3") → fonctionne
-  // sans serveur, sans réseau, de façon permanente.
+  // DOSSIER AUDIO — File System Access API
+  // Stocke le handle du dossier audio sélectionné
+  // dans IndexedDB (handle = quelques octets seulement,
+  // pas de copie des fichiers). Au démarrage, l'app
+  // redemande la permission et lit les fichiers
+  // directement depuis leur emplacement d'origine.
   // ════════════════════════════════════════════════
-  const audioDB = (() => {
-    const DB   = 'impromusic-audio';
-    const ST   = 'buffers';
-    let _db    = null;
+  const audioFolderStore = (() => {
+    const DB = 'impromusic-folder', ST = 'handles';
+    let _db = null;
 
     function open() {
       if (_db) return Promise.resolve(_db);
@@ -914,55 +915,26 @@
       });
     }
 
-    async function save(key, ab) {
-      const d  = await open();
+    async function saveHandle(handle) {
+      const d = await open();
       return new Promise((res, rej) => {
         const tx = d.transaction(ST, 'readwrite');
-        tx.objectStore(ST).put(ab, key);
+        tx.objectStore(ST).put(handle, 'folder');
         tx.oncomplete = res;
         tx.onerror    = e => rej(e.target.error);
       });
     }
 
-    async function get(key) {
+    async function getHandle() {
       const d = await open();
       return new Promise((res, rej) => {
-        const r = d.transaction(ST).objectStore(ST).get(key);
+        const r = d.transaction(ST).objectStore(ST).get('folder');
         r.onsuccess = e => res(e.target.result ?? null);
-        r.onerror   = e => rej(e.target.error);
+        r.onerror   = () => res(null);
       });
     }
 
-    async function allKeys() {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const r = d.transaction(ST).objectStore(ST).getAllKeys();
-        r.onsuccess = e => res(e.target.result);
-        r.onerror   = e => rej(e.target.error);
-      });
-    }
-
-    async function remove(key) {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const tx = d.transaction(ST, 'readwrite');
-        tx.objectStore(ST).delete(key);
-        tx.oncomplete = res;
-        tx.onerror    = e => rej(e.target.error);
-      });
-    }
-
-    async function clear() {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const tx = d.transaction(ST, 'readwrite');
-        tx.objectStore(ST).clear();
-        tx.oncomplete = res;
-        tx.onerror    = e => rej(e.target.error);
-      });
-    }
-
-    return { save, get, allKeys, remove, clear };
+    return { saveHandle, getHandle };
   })();
 
   // ════════════════════════════════════════════════
@@ -1074,40 +1046,12 @@
       return ctx;
     }
 
-    // Charge un File → AudioBuffer + sauvegarde dans IDB sous dbKey
-    async function loadFile(id, file, dbKey) {
+    // Charge un File (objet File du navigateur) → décode en AudioBuffer
+    async function loadFile(id, file) {
       _ensureCtx();
-      const ab = await file.arrayBuffer();
-      // slice(0) crée une copie pour decodeAudioData — ab reste intact pour l'IDB
-      const decoded = await ctx.decodeAudioData(ab.slice(0));
+      const ab      = await file.arrayBuffer();
+      const decoded = await ctx.decodeAudioData(ab);
       buffers.set(String(id), decoded);
-      if (dbKey) {
-        await audioDB.save(dbKey, ab);
-      }
-      return decoded;
-    }
-
-    // Charge depuis IDB (ArrayBuffer stocké) → décode
-    async function loadFromIDB(id, dbKey) {
-      _ensureCtx();
-      const ab = await audioDB.get(dbKey);
-      if (!ab) throw new Error('Non trouvé en cache: ' + dbKey);
-      const decoded = await ctx.decodeAudioData(ab.slice(0));
-      buffers.set(String(id), decoded);
-      return decoded;
-    }
-
-    // Charge depuis une URL puis met en cache IDB
-    async function loadUrl(id, url) {
-      _ensureCtx();
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const ab = await resp.arrayBuffer();
-      const decoded = await ctx.decodeAudioData(ab.slice(0));
-      buffers.set(String(id), decoded);
-      // Met en cache sous le nom de fichier extrait de l'URL
-      const key = url.split('/').pop();
-      await audioDB.save(key, ab);
       return decoded;
     }
 
@@ -1266,7 +1210,7 @@
     function clearBuffer(id) { buffers.delete(String(id)); }
 
     return {
-      loadFile, loadUrl, loadFromIDB, hasBuffer, getDuration, _copyBuffer: copyBuffer,
+      loadFile, hasBuffer, getDuration, _copyBuffer: copyBuffer,
       play, stop, pause, resume,
       getElapsed, setMasterVolume,
       isPlaying, isPaused, currentId,
@@ -2148,7 +2092,7 @@
           cue.notes   = notes;
           if (file) {
             try {
-              await engine.loadFile(cue.id, file, file.name);
+              await engine.loadFile(cue.id, file);
               cue.dbKey = file.name;
             } catch(e) { showToast('⚠ ' + e.message); }
           }
@@ -2163,7 +2107,7 @@
         cues.push(newCue);
         if (file) {
           try {
-            await engine.loadFile(id, file, file.name);
+            await engine.loadFile(id, file);
             showToast('✓ "' + name + '" — fichier chargé');
           } catch(e) {
             showToast('⚠ Erreur décodage : ' + e.message);
@@ -2185,7 +2129,7 @@
       pads.push(newPad);
       if (file) {
         try {
-          await engine.loadFile(id, file, file.name);
+          await engine.loadFile(id, file);
           showToast('✓ "' + name + '" — fichier chargé');
         } catch(e) {
           showToast('⚠ Erreur décodage : ' + e.message);
@@ -2358,25 +2302,25 @@
     return b > 1048576 ? (b/1048576).toFixed(1)+' Mo' : Math.round(b/1024)+' Ko';
   }
 
+  // _currentDirHandle : dossier sélectionné dans la session en cours
+  // (complète le handle persisté dans audioFolderStore)
+  let _currentDirHandle = null;
+
   async function openFolderImport() {
     importFiles = [];
     let files = [];
 
-    // Tentative File System Access API (Chrome desktop)
     if (window.showDirectoryPicker) {
       try {
         const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+        _currentDirHandle = dirHandle;
+        await audioFolderStore.saveHandle(dirHandle); // persiste pour les prochaines sessions
         for await (const entry of dirHandle.values()) {
-          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name)) {
+          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
             files.push(await entry.getFile());
-          }
         }
-      } catch (e) {
-        if (e.name !== 'AbortError') {
-          // Fallback input
-          document.getElementById('folderFileInput').click();
-          return;
-        }
+      } catch(e) {
+        if (e.name !== 'AbortError') document.getElementById('folderFileInput').click();
         return;
       }
     } else {
@@ -2388,7 +2332,7 @@
     _showImportDialog(files);
   }
 
-  // Fallback : input webkitdirectory
+  // Fallback : input webkitdirectory (Android sans showDirectoryPicker)
   document.getElementById('folderFileInput').addEventListener('change', function() {
     const files = Array.from(this.files).filter(f => /\.(mp3|wav|ogg|m4a|aac)$/i.test(f.name));
     this.value = '';
@@ -2454,14 +2398,14 @@
       txt.textContent = `Chargement : ${name}…`;
       const id = 'folder_' + Date.now() + '_' + done;
       try {
-        await engine.loadFile(id, file, file.name); // sauvegarde dans IDB sous file.name
+        await engine.loadFile(id, file); // décode en AudioBuffer (aucune copie IDB)
         if (importDest === 'seq') {
           const isFirst = !cues.some(c => c.state === 'next');
           cues.push({
             id, name, type: 'music', vol: 0.80,
             fadeIn: 1, fadeOut: 2, startAt: 0, notes: '',
             state: isFirst ? 'next' : 'pending',
-            dbKey: file.name,   // clé IDB pour retrouver le fichier après rechargement projet
+            dbKey: file.name, // nom de fichier → permet de le retrouver dans le dossier
           });
         } else {
           pads.push({ id, name, type: 'music', vol: 0.80, emoji: guessEmoji(file.name), dbKey: file.name });
@@ -2483,151 +2427,126 @@
   }
 
   // ════════════════════════════════════════════════
-  // PRÉCHARGEMENT DES SONS
-  // Stratégie : IDB (cache local) → fetch → manquant
-  // Fonctionne sans serveur si les sons sont en cache.
+  // CHARGEMENT DES SONS
+  // Lit les fichiers directement depuis le dossier
+  // audio sur le disque (aucune copie en IndexedDB).
+  // Au démarrage : utilise le handle persisté.
+  // Si manquants : propose de sélectionner le dossier.
   // ════════════════════════════════════════════════
-  async function preloadAllSounds() {
-    const banner     = document.getElementById('loadBanner');
-    const bannerText = document.getElementById('loadBannerText');
-    banner.classList.remove('hidden');
-    bannerText.textContent = 'Chargement des sons…';
 
-    // Construire la liste d'items à charger (url ou dbKey)
+  // Construit la liste des items à charger (dbKey = nom de fichier)
+  function _buildAudioItems() {
     const allItems = [
-      ...cues.filter(c => c.type !== 'section').map(c => ({ id: c.id, url: c.url ?? null, dbKey: c.dbKey ?? (c.url ? c.url.split('/').pop() : null), name: c.name })),
-      ...pads.map(p => ({ id: p.id, url: p.url ?? null, dbKey: p.dbKey ?? (p.url ? p.url.split('/').pop() : null), name: p.name })),
-    ].filter(x => x.dbKey || x.url);
-
-    // Déduplication : une seule tentative par dbKey
+      ...cues.filter(c => c.type !== 'section' && c.dbKey).map(c => ({ id: c.id, dbKey: c.dbKey, name: c.name })),
+      ...pads.filter(p => p.dbKey).map(p => ({ id: p.id, dbKey: p.dbKey, name: p.name })),
+    ];
+    // Déduplication par dbKey
     const seen = new Set();
-    const unique = allItems.filter(x => {
-      const k = x.dbKey ?? x.url;
-      return seen.has(k) ? false : (seen.add(k), true);
-    });
+    return allItems.filter(x => seen.has(x.dbKey) ? false : (seen.add(x.dbKey), true));
+  }
 
-    let loaded = 0, fromCache = 0, missing = [];
-
-    await Promise.allSettled(unique.map(async item => {
-      const key = item.dbKey;
+  // Charge les fichiers depuis un Map<nom, File>
+  async function _loadFromFileMap(items, fileMap, banner) {
+    let loaded = 0, missing = [];
+    for (const item of items) {
+      const file = fileMap.get(item.dbKey);
+      if (!file) { missing.push(item); continue; }
       try {
-        // 1. Essai depuis IDB (cache) — fonctionne même sans URL
-        await engine.loadFromIDB(item.id, key);
-        fromCache++;
-      } catch (_) {
-        if (!item.url) {
-          // Pas d'URL de fallback : fichier importé depuis dossier, introuvable sans import
-          missing.push({ ...item });
-          return;
+        await engine.loadFile(item.id, file);
+        // Propager le buffer aux doublons (même dbKey, id différent)
+        [...cues, ...pads].forEach(x => {
+          if (x.dbKey === item.dbKey && String(x.id) !== String(item.id)) engine._copyBuffer(item.id, x.id);
+        });
+        loaded++;
+      } catch(_) { missing.push(item); }
+      if (banner) banner.textContent = `Sons… ${loaded}/${items.length}`;
+      renderCueList(); renderPads();
+    }
+    return { loaded, missing };
+  }
+
+  async function preloadAllSounds() {
+    const banner = document.getElementById('loadBanner');
+    const text   = document.getElementById('loadBannerText');
+    const items  = _buildAudioItems();
+
+    if (!items.length) { banner.classList.add('hidden'); return; }
+
+    banner.classList.remove('hidden');
+    text.textContent = 'Chargement des sons…';
+
+    // 1. Essai depuis le handle persisté (dossier sélectionné lors d'une session précédente)
+    let missing = items;
+    const storedHandle = _currentDirHandle ?? await audioFolderStore.getHandle();
+    if (storedHandle) {
+      const perm = await storedHandle.requestPermission({ mode: 'read' }).catch(() => 'denied');
+      if (perm === 'granted') {
+        _currentDirHandle = storedHandle;
+        const fileMap = new Map();
+        for await (const entry of storedHandle.values()) {
+          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
+            fileMap.set(entry.name, await entry.getFile());
         }
-        try {
-          // 2. Essai fetch (nécessite serveur ou HTTPS)
-          await engine.loadUrl(item.id, item.url);
-        } catch (_2) {
-          // 3. Manquant — sera chargé manuellement
-          missing.push({ ...item });
+        const result = await _loadFromFileMap(items, fileMap, text);
+        missing = result.missing;
+        if (!missing.length) {
+          text.textContent = `✓ ${result.loaded} sons chargés`;
+          setTimeout(() => banner.classList.add('hidden'), 2000);
           return;
         }
       }
-      // Propager aux doublons (même dbKey, id différent)
-      allItems.filter(x => (x.dbKey ?? x.url) === (item.dbKey ?? item.url) && x.id !== item.id)
-              .forEach(dup => engine._copyBuffer(item.id, dup.id));
-      loaded++;
-      bannerText.textContent = `Sons… ${loaded + missing.length}/${unique.length}`;
-      renderCueList();
-      renderPads();
-    }));
-
-    renderCueList();
-    renderPads();
-    window._missingSounds = missing;
-
-    // Cues/pads sans aucune source (ni dbKey ni url) — jamais de fichier associé
-    const noSource = [
-      ...cues.filter(c => c.type !== 'section' && !c.dbKey && !c.url),
-      ...pads.filter(p => !p.dbKey && !p.url),
-    ];
-
-    if (missing.length === 0 && noSource.length === 0) {
-      const src = fromCache === unique.length ? ' (cache)' : '';
-      bannerText.textContent = `✓ ${loaded} sons chargés${src}`;
-      setTimeout(() => banner.classList.add('hidden'), 2000);
-    } else {
-      const missingNames = [
-        ...missing.map(m => m.name),
-        ...noSource.map(n => n.name),
-      ];
-      const total = missingNames.length;
-      const preview = missingNames.slice(0, 3).join(', ') + (total > 3 ? ` +${total - 3}` : '');
-      banner.innerHTML = `
-        <div class="load-dot" style="background:var(--red)"></div>
-        <span title="${missingNames.join('\n')}">
-          ${total} fichier${total>1?'s':''} manquant${total>1?'s':''} : <em>${preview}</em>
-        </span>
-        ${missing.length > 0 ? `
-        <button onclick="loadMissingSounds()" style="
-          background:var(--accent);color:var(--on-accent);border:none;border-radius:4px;
-          padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:6px;">
-          📂 Charger le dossier
-        </button>` : ''}
-        <button onclick="document.getElementById('loadBanner').classList.add('hidden')" style="
-          background:none;border:none;color:var(--text-muted);font-size:16px;
-          cursor:pointer;margin-left:auto;padding:0 4px;">✕</button>
-      `;
     }
+
+    // 2. Des sons restent manquants → demander à l'utilisateur de pointer le dossier
+    window._missingSounds = missing;
+    const names   = missing.map(m => m.name);
+    const preview = names.slice(0, 3).join(', ') + (names.length > 3 ? ` +${names.length - 3}` : '');
+    banner.innerHTML = `
+      <div class="load-dot" style="background:var(--red)"></div>
+      <span title="${names.join('\n')}">${names.length} son${names.length > 1 ? 's' : ''} manquant${names.length > 1 ? 's' : ''} : <em>${preview}</em></span>
+      <button onclick="loadMissingSounds()" style="
+        background:var(--accent);color:var(--on-accent);border:none;border-radius:4px;
+        padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:6px;">
+        📂 Sélectionner le dossier
+      </button>
+      <button onclick="document.getElementById('loadBanner').classList.add('hidden')" style="
+        background:none;border:none;color:var(--text-muted);font-size:16px;
+        cursor:pointer;margin-left:auto;padding:0 4px;">✕</button>
+    `;
   }
 
   // Ouvre le sélecteur de dossier pour charger les sons manquants
   async function loadMissingSounds() {
-    const missing = window._missingSounds || [];
+    const missing = window._missingSounds ?? [];
     if (!missing.length) return;
 
-    let files = [];
+    let dirHandle;
     if (window.showDirectoryPicker) {
-      try {
-        const dir = await window.showDirectoryPicker({ mode: 'read' });
-        for await (const entry of dir.values()) {
-          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
-            files.push(await entry.getFile());
-        }
-      } catch(e) { if (e.name !== 'AbortError') document.getElementById('folderFileInput').click(); return; }
+      try { dirHandle = await window.showDirectoryPicker({ mode: 'read' }); }
+      catch(e) { if (e.name !== 'AbortError') document.getElementById('folderFileInput').click(); return; }
     } else {
-      document.getElementById('folderFileInput').click();
-      return;
+      document.getElementById('folderFileInput').click(); return;
     }
 
-    const banner     = document.getElementById('loadBanner');
-    const fileMap    = new Map(files.map(f => [f.name, f]));
-    let loaded = 0;
+    _currentDirHandle = dirHandle;
+    await audioFolderStore.saveHandle(dirHandle);
 
-    for (const item of missing) {
-      const file = fileMap.get(item.dbKey);
-      if (!file) continue;
-      try {
-        await engine.loadFile(item.id, file, item.dbKey);
-        allItems_propagate(item);
-        loaded++;
-      } catch(e) { /* son manquant — déjà signalé dans le bandeau */ }
+    const fileMap = new Map();
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
+        fileMap.set(entry.name, await entry.getFile());
     }
 
-    window._missingSounds = missing.filter(m => !engine.hasBuffer(m.id));
-    banner.innerHTML = window._missingSounds.length === 0
+    const banner = document.getElementById('loadBanner');
+    const { loaded, missing: stillMissing } = await _loadFromFileMap(missing, fileMap, null);
+
+    window._missingSounds = stillMissing;
+    banner.innerHTML = stillMissing.length === 0
       ? `<div class="load-dot"></div><span>✓ Tous les sons chargés</span>`
-      : `<div class="load-dot" style="background:var(--red)"></div><span>${window._missingSounds.length} son(s) toujours manquant(s)</span>`;
+      : `<div class="load-dot" style="background:var(--red)"></div><span>${stillMissing.length} son(s) toujours manquant(s)</span>`;
 
-    if (!window._missingSounds.length) setTimeout(() => banner.classList.add('hidden'), 2000);
-    renderCueList();
-    renderPads();
-    showToast(`✓ ${loaded} son${loaded>1?'s':''} chargé${loaded>1?'s':''}`);
-  }
-
-  function allItems_propagate(item) {
-    const allItems = [
-      ...cues.map(c => ({ id: c.id, key: c.dbKey ?? (c.url ? c.url.split('/').pop() : null) })),
-      ...pads.map(p => ({ id: p.id, key: p.dbKey ?? (p.url ? p.url.split('/').pop() : null) })),
-    ];
-    allItems.filter(x => x.key && x.key === item.key && x.id !== item.id)
-            .forEach(dup => engine._copyBuffer(item.id, dup.id));
+    if (!stillMissing.length) setTimeout(() => banner.classList.add('hidden'), 2000);
+    showToast(`✓ ${loaded} son${loaded > 1 ? 's' : ''} chargé${loaded > 1 ? 's' : ''}`);
   }
 
   // ════════════════════════════════════════════════
