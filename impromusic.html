@@ -801,7 +801,11 @@
     <div class="form-field">
       <label class="form-label">Fichier audio</label>
       <div id="fieldCurrentFile" style="font-size:11px;color:var(--text-muted);margin-bottom:5px;display:none;"></div>
-      <input class="form-input" id="fieldFile" type="file" accept="audio/*" style="padding:7px">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button type="button" class="btn-secondary" style="padding:8px 12px;font-size:13px;flex-shrink:0;" onclick="pickAudioFile()">📂 Choisir…</button>
+        <span id="fieldFileName" style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Aucun fichier</span>
+      </div>
+      <input id="fieldFile" type="file" accept="audio/*" style="display:none">
     </div>
     <div class="form-field" id="fieldLoopRow">
       <label class="form-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
@@ -894,15 +898,14 @@
 
 <script>
   // ════════════════════════════════════════════════
-  // DOSSIER AUDIO — File System Access API
-  // Stocke le handle du dossier audio sélectionné
-  // dans IndexedDB (handle = quelques octets seulement,
-  // pas de copie des fichiers). Au démarrage, l'app
-  // redemande la permission et lit les fichiers
-  // directement depuis leur emplacement d'origine.
+  // HANDLES AUDIO — File System Access API
+  // Stocke un FileSystemFileHandle par fichier audio
+  // (clé = id du cue/pad). Aucune copie des données.
+  // Au démarrage, redemande la permission et lit
+  // chaque fichier directement depuis son emplacement.
   // ════════════════════════════════════════════════
-  const audioFolderStore = (() => {
-    const DB = 'impromusic-folder', ST = 'handles';
+  const audioHandleStore = (() => {
+    const DB = 'impromusic-handles', ST = 'handles';
     let _db = null;
 
     function open() {
@@ -915,26 +918,36 @@
       });
     }
 
-    async function saveHandle(handle) {
+    async function save(id, handle) {
       const d = await open();
       return new Promise((res, rej) => {
         const tx = d.transaction(ST, 'readwrite');
-        tx.objectStore(ST).put(handle, 'folder');
+        tx.objectStore(ST).put(handle, String(id));
         tx.oncomplete = res;
         tx.onerror    = e => rej(e.target.error);
       });
     }
 
-    async function getHandle() {
+    async function get(id) {
       const d = await open();
       return new Promise((res, rej) => {
-        const r = d.transaction(ST).objectStore(ST).get('folder');
+        const r = d.transaction(ST).objectStore(ST).get(String(id));
         r.onsuccess = e => res(e.target.result ?? null);
         r.onerror   = () => res(null);
       });
     }
 
-    return { saveHandle, getHandle };
+    async function remove(id) {
+      const d = await open();
+      return new Promise((res, rej) => {
+        const tx = d.transaction(ST, 'readwrite');
+        tx.objectStore(ST).delete(String(id));
+        tx.oncomplete = res;
+        tx.onerror    = () => res();
+      });
+    }
+
+    return { save, get, remove };
   })();
 
   // ════════════════════════════════════════════════
@@ -1683,8 +1696,8 @@
     document.getElementById('fieldEndAtRow').style.display   = '';
     document.getElementById('fieldLoopRow').style.display    = '';
     const curFile = document.getElementById('fieldCurrentFile');
-    if (cue.dbKey) {
-      curFile.textContent = '📎 ' + cue.dbKey;
+    if (cue.filepath) {
+      curFile.textContent = '📎 ' + cue.filepath;
       curFile.style.display = '';
     } else {
       curFile.style.display = 'none';
@@ -2048,13 +2061,50 @@
   function closeModal() {
     document.getElementById('addModal').classList.remove('open');
     editingCueId = null;
+    _pendingFileHandle = null;
+    _pendingFile = null;
     document.getElementById('btnModalAdd').textContent = 'Ajouter';
     document.getElementById('modalTitle').textContent = 'Nouveau cue';
+    document.getElementById('fieldFileName').textContent = 'Aucun fichier';
   }
 
   document.getElementById('addModal').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
   });
+
+  // Fichier sélectionné dans la modale (handle + File)
+  let _pendingFileHandle = null;
+  let _pendingFile = null;
+
+  // Ouvre le picker de fichier audio (handle si disponible, fallback input)
+  async function pickAudioFile() {
+    if (window.showOpenFilePicker) {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: 'Audio', accept: { 'audio/*': ['.mp3','.wav','.ogg','.m4a','.aac'] } }],
+        });
+        _pendingFileHandle = handle;
+        _pendingFile = await handle.getFile();
+        document.getElementById('fieldFileName').textContent = _pendingFile.name;
+        // Pré-remplir le nom si le champ est vide
+        const nameField = document.getElementById('fieldName');
+        if (!nameField.value) nameField.value = cleanFileName(_pendingFile.name);
+      } catch(e) { if (e.name !== 'AbortError') showToast('⚠ ' + e.message); }
+    } else {
+      // Fallback input file
+      const input = document.getElementById('fieldFile');
+      input.onchange = () => {
+        _pendingFile = input.files[0] ?? null;
+        _pendingFileHandle = null;
+        if (_pendingFile) {
+          document.getElementById('fieldFileName').textContent = _pendingFile.name;
+          const nameField = document.getElementById('fieldName');
+          if (!nameField.value) nameField.value = cleanFileName(_pendingFile.name);
+        }
+      };
+      input.click();
+    }
+  }
 
   async function submitModal() {
     const name = document.getElementById('fieldName').value.trim();
@@ -2065,12 +2115,18 @@
     const fadeIn  = parseFloat(document.getElementById('fieldFadeIn').value)  || 0;
     const fadeOut = parseFloat(document.getElementById('fieldFadeOut').value) || 0;
     const notes   = document.getElementById('fieldNotes').value.trim();
-    const fileInput = document.getElementById('fieldFile');
-    const file    = fileInput.files[0] || null;
+    const file    = _pendingFile;
+    const handle  = _pendingFileHandle;
 
     const btn = document.getElementById('btnModalAdd');
     btn.textContent = 'Chargement…';
     btn.disabled = true;
+
+    // Charge et stocke le handle du fichier
+    async function _loadAndStore(id) {
+      await engine.loadFile(id, file);
+      if (handle) await audioHandleStore.save(id, handle);
+    }
 
     if (modalTarget === 'seq') {
       const startAt = mmssToSec(document.getElementById('fieldStartAt').value.trim());
@@ -2078,62 +2134,43 @@
       const loop    = document.getElementById('fieldLoop').checked;
 
       if (editingCueId !== null) {
-        // ── Mise à jour d'un cue existant ──
         const cue = cues.find(c => c.id === editingCueId);
         if (cue) {
-          cue.name    = name;
-          cue.type    = type;
-          cue.vol     = vol;
-          cue.fadeIn  = fadeIn;
-          cue.fadeOut = fadeOut;
-          cue.startAt = startAt;
-          cue.endAt   = endAt;
-          cue.loop    = loop;
-          cue.notes   = notes;
+          cue.name = name; cue.type = type; cue.vol = vol;
+          cue.fadeIn = fadeIn; cue.fadeOut = fadeOut;
+          cue.startAt = startAt; cue.endAt = endAt;
+          cue.loop = loop; cue.notes = notes;
           if (file) {
-            try {
-              await engine.loadFile(cue.id, file);
-              cue.dbKey = file.name;
-            } catch(e) { showToast('⚠ ' + e.message); }
+            try { await _loadAndStore(cue.id); cue.filepath = file.name; }
+            catch(e) { showToast('⚠ ' + e.message); }
           }
           showToast('✓ Cue mis à jour');
         }
         editingCueId = null;
       } else {
-        // ── Création d'un nouveau cue ──
         const id = Date.now();
         const newCue = { id, name, type, vol, fadeIn, fadeOut, startAt, endAt, loop, notes, state: 'pending' };
-        if (file) newCue.dbKey = file.name;
+        if (file) newCue.filepath = file.name;
         cues.push(newCue);
         if (file) {
-          try {
-            await engine.loadFile(id, file);
-            showToast('✓ "' + name + '" — fichier chargé');
-          } catch(e) {
-            showToast('⚠ Erreur décodage : ' + e.message);
-          }
+          try { await _loadAndStore(id); showToast('✓ "' + name + '" — fichier chargé'); }
+          catch(e) { showToast('⚠ ' + e.message); }
         } else {
           showToast('✓ "' + name + '" ajouté (sans fichier)');
         }
       }
-
       document.getElementById('fieldStartAt').value = '';
       document.getElementById('fieldEndAt').value   = '';
-      document.getElementById('btnModalAdd').textContent = 'Ajouter';
       renderCueList();
       autoSave();
     } else {
       const id = 'p' + Date.now();
       const newPad = { id, name, type, vol, emoji: file ? guessEmoji(file.name) : typeEmojis[type] };
-      if (file) newPad.dbKey = file.name;
+      if (file) newPad.filepath = file.name;
       pads.push(newPad);
       if (file) {
-        try {
-          await engine.loadFile(id, file);
-          showToast('✓ "' + name + '" — fichier chargé');
-        } catch(e) {
-          showToast('⚠ Erreur décodage : ' + e.message);
-        }
+        try { await _loadAndStore(id); showToast('✓ "' + name + '" — fichier chargé'); }
+        catch(e) { showToast('⚠ ' + e.message); }
       } else {
         showToast('✓ "' + name + '" ajouté (sans fichier)');
       }
@@ -2145,7 +2182,6 @@
     btn.disabled = false;
     closeModal();
     ['fieldName','fieldNotes'].forEach(id => document.getElementById(id).value = '');
-    fileInput.value = '';
   }
 
   // ════════════════════════════════════════════════
@@ -2302,22 +2338,21 @@
     return b > 1048576 ? (b/1048576).toFixed(1)+' Mo' : Math.round(b/1024)+' Ko';
   }
 
-  // _currentDirHandle : dossier sélectionné dans la session en cours
-  // (complète le handle persisté dans audioFolderStore)
-  let _currentDirHandle = null;
+  // Handles du dossier en cours (session) : Map<filename, FileSystemFileHandle>
+  let _currentFileHandles = new Map();
 
   async function openFolderImport() {
     importFiles = [];
-    let files = [];
+    _currentFileHandles = new Map();
 
     if (window.showDirectoryPicker) {
       try {
         const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
-        _currentDirHandle = dirHandle;
-        await audioFolderStore.saveHandle(dirHandle); // persiste pour les prochaines sessions
         for await (const entry of dirHandle.values()) {
-          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
-            files.push(await entry.getFile());
+          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name)) {
+            _currentFileHandles.set(entry.name, entry); // garde le FileSystemFileHandle
+            importFiles.push(await entry.getFile());
+          }
         }
       } catch(e) {
         if (e.name !== 'AbortError') document.getElementById('folderFileInput').click();
@@ -2328,12 +2363,13 @@
       return;
     }
 
-    if (!files.length) { showToast('Aucun fichier audio trouvé'); return; }
-    _showImportDialog(files);
+    if (!importFiles.length) { showToast('Aucun fichier audio trouvé'); return; }
+    _showImportDialog(importFiles);
   }
 
   // Fallback : input webkitdirectory (Android sans showDirectoryPicker)
   document.getElementById('folderFileInput').addEventListener('change', function() {
+    _currentFileHandles = new Map();
     const files = Array.from(this.files).filter(f => /\.(mp3|wav|ogg|m4a|aac)$/i.test(f.name));
     this.value = '';
     if (!files.length) { showToast('Aucun fichier audio'); return; }
@@ -2398,17 +2434,20 @@
       txt.textContent = `Chargement : ${name}…`;
       const id = 'folder_' + Date.now() + '_' + done;
       try {
-        await engine.loadFile(id, file); // décode en AudioBuffer (aucune copie IDB)
+        await engine.loadFile(id, file);
+        // Persiste le handle individuel si disponible (import dossier avec showDirectoryPicker)
+        const fileHandle = _currentFileHandles.get(file.name);
+        if (fileHandle) await audioHandleStore.save(id, fileHandle);
         if (importDest === 'seq') {
           const isFirst = !cues.some(c => c.state === 'next');
           cues.push({
             id, name, type: 'music', vol: 0.80,
             fadeIn: 1, fadeOut: 2, startAt: 0, notes: '',
             state: isFirst ? 'next' : 'pending',
-            dbKey: file.name, // nom de fichier → permet de le retrouver dans le dossier
+            filepath: file.name, // nom du fichier audio (clé de liaison avec le handle IDB)
           });
         } else {
-          pads.push({ id, name, type: 'music', vol: 0.80, emoji: guessEmoji(file.name), dbKey: file.name });
+          pads.push({ id, name, type: 'music', vol: 0.80, emoji: guessEmoji(file.name), filepath: file.name });
         }
       } catch(e) {
         showToast('⚠ Erreur : ' + name);
@@ -2427,42 +2466,21 @@
   }
 
   // ════════════════════════════════════════════════
-  // CHARGEMENT DES SONS
-  // Lit les fichiers directement depuis le dossier
-  // audio sur le disque (aucune copie en IndexedDB).
-  // Au démarrage : utilise le handle persisté.
-  // Si manquants : propose de sélectionner le dossier.
+  // CHARGEMENT DES SONS — handles par fichier
+  // Chaque cue/pad stocke son FileSystemFileHandle
+  // dans IndexedDB. Au démarrage, on redemande la
+  // permission fichier par fichier et on charge.
+  // Aucune copie des données audio.
   // ════════════════════════════════════════════════
 
-  // Construit la liste des items à charger (dbKey = nom de fichier)
   function _buildAudioItems() {
-    const allItems = [
-      ...cues.filter(c => c.type !== 'section' && c.dbKey).map(c => ({ id: c.id, dbKey: c.dbKey, name: c.name })),
-      ...pads.filter(p => p.dbKey).map(p => ({ id: p.id, dbKey: p.dbKey, name: p.name })),
+    const items = [
+      ...cues.filter(c => c.type !== 'section' && c.filepath).map(c => ({ id: c.id, filepath: c.filepath, name: c.name })),
+      ...pads.filter(p => p.filepath).map(p => ({ id: p.id, filepath: p.filepath, name: p.name })),
     ];
-    // Déduplication par dbKey
+    // Déduplication par id (chaque cue/pad a son propre handle)
     const seen = new Set();
-    return allItems.filter(x => seen.has(x.dbKey) ? false : (seen.add(x.dbKey), true));
-  }
-
-  // Charge les fichiers depuis un Map<nom, File>
-  async function _loadFromFileMap(items, fileMap, banner) {
-    let loaded = 0, missing = [];
-    for (const item of items) {
-      const file = fileMap.get(item.dbKey);
-      if (!file) { missing.push(item); continue; }
-      try {
-        await engine.loadFile(item.id, file);
-        // Propager le buffer aux doublons (même dbKey, id différent)
-        [...cues, ...pads].forEach(x => {
-          if (x.dbKey === item.dbKey && String(x.id) !== String(item.id)) engine._copyBuffer(item.id, x.id);
-        });
-        loaded++;
-      } catch(_) { missing.push(item); }
-      if (banner) banner.textContent = `Sons… ${loaded}/${items.length}`;
-      renderCueList(); renderPads();
-    }
-    return { loaded, missing };
+    return items.filter(x => seen.has(x.id) ? false : (seen.add(x.id), true));
   }
 
   async function preloadAllSounds() {
@@ -2471,33 +2489,34 @@
     const items  = _buildAudioItems();
 
     if (!items.length) { banner.classList.add('hidden'); return; }
-
     banner.classList.remove('hidden');
     text.textContent = 'Chargement des sons…';
 
-    // 1. Essai depuis le handle persisté (dossier sélectionné lors d'une session précédente)
-    let missing = items;
-    const storedHandle = _currentDirHandle ?? await audioFolderStore.getHandle();
-    if (storedHandle) {
-      const perm = await storedHandle.requestPermission({ mode: 'read' }).catch(() => 'denied');
-      if (perm === 'granted') {
-        _currentDirHandle = storedHandle;
-        const fileMap = new Map();
-        for await (const entry of storedHandle.values()) {
-          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
-            fileMap.set(entry.name, await entry.getFile());
-        }
-        const result = await _loadFromFileMap(items, fileMap, text);
-        missing = result.missing;
-        if (!missing.length) {
-          text.textContent = `✓ ${result.loaded} sons chargés`;
-          setTimeout(() => banner.classList.add('hidden'), 2000);
-          return;
-        }
-      }
+    let loaded = 0, missing = [];
+
+    await Promise.allSettled(items.map(async item => {
+      const handle = await audioHandleStore.get(item.id);
+      if (!handle) { missing.push(item); return; }
+      try {
+        const perm = await handle.requestPermission({ mode: 'read' });
+        if (perm !== 'granted') { missing.push(item); return; }
+        const file = await handle.getFile();
+        await engine.loadFile(item.id, file);
+        loaded++;
+      } catch(_) { missing.push(item); }
+      text.textContent = `Sons… ${loaded}/${items.length}`;
+      renderCueList(); renderPads();
+    }));
+
+    renderCueList(); renderPads();
+
+    if (!missing.length) {
+      text.textContent = `✓ ${loaded} sons chargés`;
+      setTimeout(() => banner.classList.add('hidden'), 2000);
+      return;
     }
 
-    // 2. Des sons restent manquants → demander à l'utilisateur de pointer le dossier
+    // Sons sans handle → proposer de sélectionner le dossier
     window._missingSounds = missing;
     const names   = missing.map(m => m.name);
     const preview = names.slice(0, 3).join(', ') + (names.length > 3 ? ` +${names.length - 3}` : '');
@@ -2515,30 +2534,38 @@
     `;
   }
 
-  // Ouvre le sélecteur de dossier pour charger les sons manquants
+  // Sélectionne un dossier, charge les sons manquants et persiste les handles
   async function loadMissingSounds() {
     const missing = window._missingSounds ?? [];
     if (!missing.length) return;
 
-    let dirHandle;
+    let fileHandles = new Map(); // filepath → FileSystemFileHandle
+
     if (window.showDirectoryPicker) {
-      try { dirHandle = await window.showDirectoryPicker({ mode: 'read' }); }
-      catch(e) { if (e.name !== 'AbortError') document.getElementById('folderFileInput').click(); return; }
+      try {
+        const dir = await window.showDirectoryPicker({ mode: 'read' });
+        for await (const entry of dir.values()) {
+          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
+            fileHandles.set(entry.name, entry);
+        }
+      } catch(e) { if (e.name !== 'AbortError') document.getElementById('folderFileInput').click(); return; }
     } else {
       document.getElementById('folderFileInput').click(); return;
     }
 
-    _currentDirHandle = dirHandle;
-    await audioFolderStore.saveHandle(dirHandle);
-
-    const fileMap = new Map();
-    for await (const entry of dirHandle.values()) {
-      if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
-        fileMap.set(entry.name, await entry.getFile());
-    }
-
     const banner = document.getElementById('loadBanner');
-    const { loaded, missing: stillMissing } = await _loadFromFileMap(missing, fileMap, null);
+    let loaded = 0, stillMissing = [];
+
+    for (const item of missing) {
+      const handle = fileHandles.get(item.filepath);
+      if (!handle) { stillMissing.push(item); continue; }
+      try {
+        const file = await handle.getFile();
+        await engine.loadFile(item.id, file);
+        await audioHandleStore.save(item.id, handle); // persiste pour les prochaines sessions
+        loaded++;
+      } catch(_) { stillMissing.push(item); }
+    }
 
     window._missingSounds = stillMissing;
     banner.innerHTML = stillMissing.length === 0
@@ -2546,6 +2573,7 @@
       : `<div class="load-dot" style="background:var(--red)"></div><span>${stillMissing.length} son(s) toujours manquant(s)</span>`;
 
     if (!stillMissing.length) setTimeout(() => banner.classList.add('hidden'), 2000);
+    renderCueList(); renderPads();
     showToast(`✓ ${loaded} son${loaded > 1 ? 's' : ''} chargé${loaded > 1 ? 's' : ''}`);
   }
 
@@ -2579,9 +2607,18 @@
   }
 
   // Injecte les données d'un projet dans les tableaux en cours
+  // Migre automatiquement dbKey → filepath pour les anciens projets
   function _applyProjectData(data) {
-    cues.length = 0; (data.cues ?? []).forEach(c => cues.push(c));
-    pads.length = 0; (data.pads ?? []).forEach(p => pads.push(p));
+    cues.length = 0;
+    (data.cues ?? []).forEach(c => {
+      if (c.dbKey && !c.filepath) { c.filepath = c.dbKey; delete c.dbKey; }
+      cues.push(c);
+    });
+    pads.length = 0;
+    (data.pads ?? []).forEach(p => {
+      if (p.dbKey && !p.filepath) { p.filepath = p.dbKey; delete p.dbKey; }
+      pads.push(p);
+    });
     currentProjectName = data.name ?? null;
     document.querySelector('.project-name').textContent = currentProjectName ?? '—';
   }
