@@ -898,57 +898,13 @@
 
 <script>
   // ════════════════════════════════════════════════
-  // HANDLES AUDIO — File System Access API
-  // Stocke un FileSystemFileHandle par fichier audio
-  // (clé = id du cue/pad). Aucune copie des données.
-  // Au démarrage, redemande la permission et lit
-  // chaque fichier directement depuis son emplacement.
+  // HANDLES AUDIO — mémoire session uniquement
+  // Map<id, FileSystemFileHandle> — aucune persistance.
+  // Peuplée à l'import dossier ou à la sélection
+  // d'un fichier individuel. Perdue au rechargement
+  // → l'utilisateur re-sélectionne le dossier.
   // ════════════════════════════════════════════════
-  const audioHandleStore = (() => {
-    const DB = 'impromusic-handles', ST = 'handles';
-    let _db = null;
-
-    function open() {
-      if (_db) return Promise.resolve(_db);
-      return new Promise((res, rej) => {
-        const r = indexedDB.open(DB, 1);
-        r.onupgradeneeded = e => e.target.result.createObjectStore(ST);
-        r.onsuccess = e => { _db = e.target.result; res(_db); };
-        r.onerror   = e => rej(e.target.error);
-      });
-    }
-
-    async function save(id, handle) {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const tx = d.transaction(ST, 'readwrite');
-        tx.objectStore(ST).put(handle, String(id));
-        tx.oncomplete = res;
-        tx.onerror    = e => rej(e.target.error);
-      });
-    }
-
-    async function get(id) {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const r = d.transaction(ST).objectStore(ST).get(String(id));
-        r.onsuccess = e => res(e.target.result ?? null);
-        r.onerror   = () => res(null);
-      });
-    }
-
-    async function remove(id) {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const tx = d.transaction(ST, 'readwrite');
-        tx.objectStore(ST).delete(String(id));
-        tx.oncomplete = res;
-        tx.onerror    = () => res();
-      });
-    }
-
-    return { save, get, remove };
-  })();
+  const audioHandles = new Map(); // id (string) → FileSystemFileHandle
 
   // ════════════════════════════════════════════════
   // PROJETS — fichier JSON sur le disque
@@ -2125,7 +2081,7 @@
     // Charge et stocke le handle du fichier
     async function _loadAndStore(id) {
       await engine.loadFile(id, file);
-      if (handle) await audioHandleStore.save(id, handle);
+      if (handle) audioHandles.set(String(id), handle);
     }
 
     if (modalTarget === 'seq') {
@@ -2437,7 +2393,7 @@
         await engine.loadFile(id, file);
         // Persiste le handle individuel si disponible (import dossier avec showDirectoryPicker)
         const fileHandle = _currentFileHandles.get(file.name);
-        if (fileHandle) await audioHandleStore.save(id, fileHandle);
+        if (fileHandle) audioHandles.set(String(id), fileHandle);
         if (importDest === 'seq') {
           const isFirst = !cues.some(c => c.state === 'next');
           cues.push({
@@ -2495,11 +2451,9 @@
     let loaded = 0, missing = [];
 
     await Promise.allSettled(items.map(async item => {
-      const handle = await audioHandleStore.get(item.id);
+      const handle = audioHandles.get(String(item.id));
       if (!handle) { missing.push(item); return; }
       try {
-        const perm = await handle.requestPermission({ mode: 'read' });
-        if (perm !== 'granted') { missing.push(item); return; }
         const file = await handle.getFile();
         await engine.loadFile(item.id, file);
         loaded++;
@@ -2562,7 +2516,7 @@
       try {
         const file = await handle.getFile();
         await engine.loadFile(item.id, file);
-        await audioHandleStore.save(item.id, handle); // persiste pour les prochaines sessions
+        audioHandles.set(String(item.id), handle);
         loaded++;
       } catch(_) { stillMissing.push(item); }
     }
@@ -2865,14 +2819,15 @@
   }
 
   // ── INIT ──
-  // Restaure le dernier projet depuis le cache localStorage (survit au rechargement de page).
-  // Les fichiers audio sont rechargés depuis IndexedDB (cache audio persistant).
+  // Restaure le projet depuis le cache localStorage.
+  // Les sons ne sont pas persistés — l'utilisateur
+  // re-sélectionne son dossier audio à chaque session.
   (async () => {
     _restoreCachedProject();
     renderCueList();
     renderPads();
-    await preloadAllSounds();
-    await _migrateOldProjects(); // détecte et propose la migration si nécessaire
+    await preloadAllSounds();   // affiche le bandeau si des sons sont attendus
+    await _migrateOldProjects(); // détecte les anciens spectacles IndexedDB à migrer
   })();
 </script>
 </body>
