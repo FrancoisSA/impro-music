@@ -675,8 +675,9 @@
   <div class="app-title">🎵 ImproMusic</div>
   <div class="project-name">—</div>
   <div style="display:flex;gap:6px;">
-    <button class="btn-folder" onclick="openProjectsModal()" title="Gérer les spectacles">🎭 Spectacles</button>
-    <button class="btn-folder" onclick="openFolderImport()" title="Importer un dossier audio">📂 Dossier</button>
+    <button class="btn-folder" onclick="openProjectFile()" title="Ouvrir un spectacle (.json)">📂 Ouvrir</button>
+    <button class="btn-folder" onclick="saveProjectFile()" title="Enregistrer le spectacle en JSON">💾 Enregistrer</button>
+    <button class="btn-folder" onclick="openFolderImport()" title="Importer un dossier audio">🎵 Sons</button>
     <button class="btn-icon" onclick="openAddModal('seq')" title="Ajouter cue séquentiel">+Seq</button>
     <button class="btn-icon" onclick="openAddModal('pad')" title="Ajouter bouton libre">+Pad</button>
     <button class="btn-icon" onclick="openThemePanel()" title="Couleurs & thème">⚙</button>
@@ -846,25 +847,8 @@
 
 <!-- Input fichiers fallback (webkitdirectory) -->
 <input type="file" id="folderFileInput" multiple accept="audio/*" webkitdirectory>
-
-<!-- MODAL SPECTACLES -->
-<div class="modal-overlay" id="projectsModal">
-  <div class="modal-sheet" style="max-width:480px;width:100%">
-    <div class="modal-handle"></div>
-    <div class="modal-title">🎭 Spectacles</div>
-
-    <div style="display:flex;gap:8px;margin-bottom:14px;">
-      <input id="projectNameInput" type="text" placeholder="Nom du spectacle…" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:14px;">
-      <button class="btn-primary" onclick="saveCurrentProject()">💾 Sauver</button>
-    </div>
-
-    <div id="projectsList" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
-
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick="closeProjectsModal()">Fermer</button>
-    </div>
-  </div>
-</div>
+<!-- Input ouverture fichier JSON projet (fallback sans File System Access API) -->
+<input type="file" id="projectFileInput" accept=".json" style="display:none">
 
 <div class="toast" id="toast"></div>
 
@@ -982,61 +966,82 @@
   })();
 
   // ════════════════════════════════════════════════
-  // PROJETS — sauvegarde/chargement des spectacles
+  // PROJETS — fichier JSON sur le disque
+  // Utilise File System Access API si disponible,
+  // sinon téléchargement / input file en fallback.
+  // Un cache localStorage permet de restaurer le
+  // projet en cours après un rechargement de page.
   // ════════════════════════════════════════════════
-  const projectsDB = (() => {
-    const DB = 'impromusic-projects', ST = 'projects';
-    let _db = null;
+  const projectFile = (() => {
+    let _handle = null; // FileSystemFileHandle (File System Access API)
 
-    function open() {
-      if (_db) return Promise.resolve(_db);
-      return new Promise((res, rej) => {
-        const req = indexedDB.open(DB, 1);
-        req.onupgradeneeded = e => e.target.result.createObjectStore(ST, { keyPath: 'id' });
-        req.onsuccess = e => { _db = e.target.result; res(_db); };
-        req.onerror   = e => rej(e.target.error);
+    // Ouvre un fichier JSON via le picker (ou input file en fallback)
+    async function open() {
+      if (window.showOpenFilePicker) {
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            types: [{ description: 'Projet ImproMusic', accept: { 'application/json': ['.json'] } }],
+          });
+          _handle = handle;
+          const file = await handle.getFile();
+          const text = await file.text();
+          return { data: JSON.parse(text), name: file.name.replace(/\.json$/i, '') };
+        } catch(e) {
+          if (e.name === 'AbortError') return null;
+          throw e;
+        }
+      }
+      // Fallback : input file
+      return new Promise(res => {
+        const input = document.getElementById('projectFileInput');
+        input.onchange = async () => {
+          const file = input.files[0];
+          input.value = '';
+          if (!file) { res(null); return; }
+          const text = await file.text();
+          res({ data: JSON.parse(text), name: file.name.replace(/\.json$/i, '') });
+        };
+        input.click();
       });
     }
 
-    async function saveProject(project) {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const tx = d.transaction(ST, 'readwrite');
-        tx.objectStore(ST).put(project);
-        tx.oncomplete = res;
-        tx.onerror    = e => rej(e.target.error);
-      });
+    // Enregistre dans le fichier ouvert (ou ouvre le picker si premier enregistrement)
+    async function save(data, suggestedName) {
+      if (window.showSaveFilePicker) {
+        try {
+          if (!_handle) {
+            _handle = await window.showSaveFilePicker({
+              suggestedName: (suggestedName || 'spectacle') + '.json',
+              types: [{ description: 'Projet ImproMusic', accept: { 'application/json': ['.json'] } }],
+            });
+          }
+          const writable = await _handle.createWritable();
+          await writable.write(JSON.stringify(data, null, 2));
+          await writable.close();
+          const file = await _handle.getFile();
+          return file.name.replace(/\.json$/i, '');
+        } catch(e) {
+          if (e.name === 'AbortError') return null;
+          // En cas d'erreur (ex: permission révoquée), forcer le re-pick
+          _handle = null;
+          throw e;
+        }
+      }
+      // Fallback : téléchargement
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = (suggestedName || 'spectacle') + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      return suggestedName;
     }
 
-    async function listProjects() {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const req = d.transaction(ST, 'readonly').objectStore(ST).getAll();
-        req.onsuccess = e => res(e.target.result);
-        req.onerror   = e => rej(e.target.error);
-      });
-    }
+    function hasHandle() { return !!_handle; }
+    function clear()     { _handle = null; }
 
-    async function loadProject(id) {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const req = d.transaction(ST, 'readonly').objectStore(ST).get(id);
-        req.onsuccess = e => res(e.target.result ?? null);
-        req.onerror   = e => rej(e.target.error);
-      });
-    }
-
-    async function deleteProject(id) {
-      const d = await open();
-      return new Promise((res, rej) => {
-        const tx = d.transaction(ST, 'readwrite');
-        tx.objectStore(ST).delete(id);
-        tx.oncomplete = res;
-        tx.onerror    = e => rej(e.target.error);
-      });
-    }
-
-    return { saveProject, listProjects, loadProject, deleteProject };
+    return { open, save, hasHandle, clear };
   })();
 
   // ════════════════════════════════════════════════
@@ -1287,8 +1292,7 @@
   let silenceActive  = false;
   let editingCueId = null;   // null = création, sinon id du cue à modifier
   let confirmDeleteId = null; // id du cue en attente de confirmation de suppression
-  let currentProjectId   = null;  // id du spectacle actif (null = non sauvegardé)
-  let currentProjectName = null;
+  let currentProjectName = null; // nom du fichier projet ouvert (sans extension)
 
   // ════════════════════════════════════════════════
   // UTILITAIRES TEMPS
@@ -2627,112 +2631,92 @@
   }
 
   // ════════════════════════════════════════════════
-  // GESTION DES SPECTACLES (projets)
+  // GESTION DES SPECTACLES — fichiers JSON
   // ════════════════════════════════════════════════
 
-  function openProjectsModal() {
-    document.getElementById('projectsModal').classList.add('open');
-    refreshProjectsList();
-  }
-
-  function closeProjectsModal() {
-    document.getElementById('projectsModal').classList.remove('open');
-  }
-
-  function _buildProjectPayload(id, name) {
+  // Construit le payload JSON du projet en cours
+  function _buildProjectPayload() {
     return {
-      id,
-      name,
+      version: '1.0',
+      name: currentProjectName ?? 'Sans titre',
       savedAt: new Date().toISOString(),
       cues: cues.map(c => ({ ...c, state: c.state === 'playing' ? 'pending' : c.state })),
       pads: pads.map(p => ({ ...p })),
     };
   }
 
-  async function saveCurrentProject() {
-    const nameInput = document.getElementById('projectNameInput');
-    const name = nameInput.value.trim();
-    if (!name) { showToast('⚠ Saisir un nom de spectacle'); return; }
-
-    const id = name.toLowerCase().replace(/\s+/g, '-');
-    await projectsDB.saveProject(_buildProjectPayload(id, name));
-    currentProjectId   = id;
-    currentProjectName = name;
-    document.querySelector('.project-name').textContent = name;
-    nameInput.value = '';
-    showToast('💾 Spectacle sauvegardé : ' + name);
-    refreshProjectsList();
+  // Cache localStorage : restaure le dernier état après rechargement de page
+  function _cacheProject() {
+    try { localStorage.setItem('impromusic-last-project', JSON.stringify(_buildProjectPayload())); } catch(_) {}
+  }
+  function _restoreCachedProject() {
+    try {
+      const raw = localStorage.getItem('impromusic-last-project');
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      _applyProjectData(data);
+      return true;
+    } catch(_) { return false; }
   }
 
-  // Sauvegarde silencieuse du projet actif après chaque modification
+  // Injecte les données d'un projet dans les tableaux en cours
+  function _applyProjectData(data) {
+    cues.length = 0; (data.cues ?? []).forEach(c => cues.push(c));
+    pads.length = 0; (data.pads ?? []).forEach(p => pads.push(p));
+    currentProjectName = data.name ?? null;
+    document.querySelector('.project-name').textContent = currentProjectName ?? '—';
+  }
+
+  // Ouvre un fichier .json via le picker
+  async function openProjectFile() {
+    try {
+      const result = await projectFile.open();
+      if (!result) return;
+      stopAll();
+      engine.clearBuffers();
+      _applyProjectData(result.data);
+      currentProjectName = result.name;
+      document.querySelector('.project-name').textContent = result.name;
+      _cacheProject();
+      renderCueList();
+      renderPads();
+      showToast('📂 ' + result.name + ' — vérification des fichiers…');
+      await preloadAllSounds();
+    } catch(e) {
+      showToast('⚠ Erreur ouverture : ' + e.message);
+    }
+  }
+
+  // Enregistre dans le fichier courant (ou ouvre le picker si nouveau)
+  async function saveProjectFile() {
+    try {
+      const name = await projectFile.save(_buildProjectPayload(), currentProjectName ?? 'spectacle');
+      if (!name) return; // annulé
+      currentProjectName = name;
+      document.querySelector('.project-name').textContent = name;
+      _cacheProject();
+      showToast('💾 Enregistré : ' + name + '.json');
+    } catch(e) {
+      showToast('⚠ Erreur enregistrement : ' + e.message);
+    }
+  }
+
+  // Sauvegarde automatique après chaque modification (fichier + cache)
   async function autoSave() {
-    if (!currentProjectId) return;
-    await projectsDB.saveProject(_buildProjectPayload(currentProjectId, currentProjectName));
-    _flashSaveIndicator();
+    _cacheProject(); // toujours mettre à jour le cache local
+    if (!projectFile.hasHandle()) return; // pas de fichier ouvert → pas d'écriture
+    try {
+      await projectFile.save(_buildProjectPayload(), currentProjectName);
+      _flashSaveIndicator();
+    } catch(_) { /* échec silencieux, le cache localStorage est déjà à jour */ }
   }
 
   let _flashTimer = null;
   function _flashSaveIndicator() {
     const el = document.querySelector('.project-name');
-    el.textContent = currentProjectName + ' ✓';
+    el.textContent = (currentProjectName ?? '—') + ' ✓';
     clearTimeout(_flashTimer);
-    _flashTimer = setTimeout(() => { el.textContent = currentProjectName; }, 1500);
-  }
-
-  async function refreshProjectsList() {
-    const list = document.getElementById('projectsList');
-    const projects = await projectsDB.listProjects();
-    if (projects.length === 0) {
-      list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">Aucun spectacle sauvegardé</div>';
-      return;
-    }
-    projects.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
-    list.innerHTML = '';
-    projects.forEach(p => {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;';
-      const date = new Date(p.savedAt).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-      row.innerHTML = `
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</div>
-          <div style="font-size:11px;color:var(--text-muted);">${p.cues.length} cues · ${p.pads.length} pads · ${date}</div>
-        </div>
-        <button class="btn-primary" style="padding:5px 10px;font-size:12px;" data-id="${p.id}">📂 Charger</button>
-        <button class="btn-secondary btn-danger" style="padding:5px 8px;font-size:12px;" data-del="${p.id}">✕</button>
-      `;
-      row.querySelector('[data-id]').addEventListener('click', () => loadProject(p.id));
-      row.querySelector('[data-del]').addEventListener('click', () => deleteProject(p.id));
-      list.appendChild(row);
-    });
-  }
-
-  async function loadProject(id) {
-    const project = await projectsDB.loadProject(id);
-    if (!project) { showToast('⚠ Spectacle introuvable'); return; }
-
-    stopAll();
-    engine.clearBuffers(); // vide les anciens buffers avant de recharger
-
-    // Remplace les données en place
-    cues.length = 0;
-    project.cues.forEach(c => cues.push(c));
-    pads.length = 0;
-    project.pads.forEach(p => pads.push(p));
-
-    currentProjectId   = project.id;
-    currentProjectName = project.name;
-    document.querySelector('.project-name').textContent = project.name;
-    closeProjectsModal();
-    renderCueList();
-    renderPads();
-    showToast('📂 ' + project.name + ' — vérification des fichiers…');
-    await preloadAllSounds();
-  }
-
-  async function deleteProject(id) {
-    await projectsDB.deleteProject(id);
-    showToast('🗑 Spectacle supprimé');
-    refreshProjectsList();
+    _flashTimer = setTimeout(() => { el.textContent = currentProjectName ?? '—'; }, 1500);
   }
 
   // ════════════════════════════════════════════════
@@ -2863,19 +2847,10 @@
   loadSavedTheme();
 
   // ── INIT ──
-  // Tente de recharger le dernier spectacle avant le premier rendu
-  // pour éviter le flash des cues hardcodés par défaut
+  // Restaure le dernier projet depuis le cache localStorage (survit au rechargement de page).
+  // Les fichiers audio sont rechargés depuis IndexedDB (cache audio persistant).
   (async () => {
-    const projects = await projectsDB.listProjects();
-    if (projects.length > 0) {
-      projects.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
-      const last = projects[0];
-      cues.length = 0; last.cues.forEach(c => cues.push(c));
-      pads.length = 0; last.pads.forEach(p => pads.push(p));
-      currentProjectId   = last.id;
-      currentProjectName = last.name;
-      document.querySelector('.project-name').textContent = last.name;
-    }
+    _restoreCachedProject();
     renderCueList();
     renderPads();
     await preloadAllSounds();
