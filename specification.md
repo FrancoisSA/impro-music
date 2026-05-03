@@ -1,5 +1,5 @@
 # Spécification — Application de régie son pour spectacle
-**Version** : 1.0 — 2026-05-01  
+**Version** : 1.1 — 2026-05-03
 **Contexte** : Application statique HTML/CSS/JavaScript, sans serveur, tournant sur Chrome Android (tablette)
 
 ---
@@ -190,6 +190,204 @@ Une application **100% statique** (zéro serveur) est **pleinement faisable** po
 - **Fallback `<input type="file">`** pour l'import audio si File System Access non disponible
 
 L'application peut être livrée comme un simple dossier de fichiers statiques, ouvert directement dans Chrome Android via `file://` ou hébergé gratuitement sur GitHub Pages / Netlify.
+
+---
+
+---
+
+## 6. Design & Architecture réelle (v1.1)
+
+### 6.1 Choix d'architecture : fichier unique
+
+L'application est livrée comme **un seul fichier `impromusic.html`** (~3 500 lignes). Ce choix délibéré répond aux contraintes du terrain :
+
+- Ouverture par double-clic ou drag-and-drop dans Chrome, sans installation
+- Aucune dépendance réseau, aucun build, aucun serveur
+- Distribution par simple copie du fichier (clé USB, AirDrop, e-mail)
+- Pas de problème de CORS (`file://` + File System Access API)
+
+Le code JS est organisé en **IIFE thématiques** séparées par des bannières de commentaires, simulating the module structure without actual ES modules (incompatibles avec `file://`).
+
+---
+
+### 6.2 Layout général
+
+```
+┌─────────────────────────────────────────────────────┐
+│  HEADER : titre · menu Spectacle · boutons · volume  │
+├─────────────────────────────────────────────────────┤
+│  BANDEAU NOW PLAYING (transport + progression)       │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│   COL SÉQUENCE + NOTES (flex, resize par drag)      │
+│   ┌──────────────────┬──┬──────────────────────┐    │
+│   │ header séquence  │  │ header Notes         │    │
+│   ├──────────────────┤  ├──────────────────────┤    │
+│   │                  │  │                      │    │
+│   │  liste des cues  │◄─►  notes alignées      │    │
+│   │  (scroll)        │  │  (même scroll)       │    │
+│   │                  │  │                      │    │
+│   └──────────────────┴──┴──────────────────────┘    │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Principe clé** : séquence et notes partagent un **unique conteneur de scroll** (`.seq-rows`). Chaque ligne est une `.seq-row` flex contenant `[.seq-cell | .note-cell]`. L'alignement est garanti sans aucune synchronisation JavaScript.
+
+---
+
+### 6.3 Moteur audio
+
+```
+engine (IIFE)
+│
+├── buffers : Map<id, AudioBuffer>      ← décodés une fois, gardés en mémoire
+├── ctx : AudioContext                  ← créé au premier geste utilisateur
+├── masterGain : GainNode               ← volume global
+│
+└── session active (1 source à la fois)
+    ├── activeSource : AudioBufferSourceNode
+    ├── activeGain   : GainNode          ← volume + fades
+    ├── activeId     : string
+    ├── pausedOffset : number|null       ← null = lecture, number = pause
+    ├── ctxTimeAtStart + bufferOffset   ← calcul de position (getElapsed)
+    └── endCallback  : Function
+```
+
+**Contraintes de design** :
+- **Un seul son actif** à la fois (cue séquence OU pad libre, jamais les deux)
+- **`AudioBufferSourceNode` non réutilisable** — un nouvel objet est créé à chaque `play()` (spec Web Audio)
+- **Pause** = stop + mémorisation de `pausedOffset` → `resume()` crée une nouvelle source à ce point
+- **Fade out** = ramp sur le GainNode + setTimeout pour stopper la source après la durée
+
+---
+
+### 6.4 Persistance des fichiers audio
+
+Trois niveaux de résolution, tentés dans l'ordre :
+
+```
+1. audioHandles (Map en mémoire, session courante)
+        ↓ si absent
+2. audioDirStore (IndexedDB, FileSystemDirectoryHandle)
+   → requestPermission() = 1 clic Chrome
+   → _scanDir() : scan récursif → Map<relpath, FileHandle>
+        ↓ si absent ou dossier différent
+3. Bandeau rouge → picker manuel → retour au niveau 2
+```
+
+**Deux racines distinctes** (`rootSeq` / `rootPads`) permettent des dossiers différents pour la séquence et les sons libres. Le nom de chaque racine est stocké dans le JSON (`audioRootSeq` / `audioRootPads`) pour validation au rechargement.
+
+**Fix NFD/NFC** : macOS retourne les noms de fichiers en NFD (accents décomposés). Tous les chemins sont normalisés en NFC lors du scan et des lookups pour garantir la correspondance avec les chaînes JSON.
+
+---
+
+### 6.5 Format JSON du projet
+
+```json
+{
+  "version": "1.1",
+  "name": "Nom du spectacle",
+  "savedAt": "2026-05-03T...",
+  "audioRootSeq":  "PL-RECONSTITUTION",
+  "audioRootPads": "sounds",
+  "cues": [
+    {
+      "id": "folder_...",
+      "type": "section | music | fx | ambiance | loop",
+      "name": "Nom du cue",
+      "vol": 0.8,
+      "fadeIn": 1,
+      "fadeOut": 2,
+      "startAt": 0,
+      "endAt": 0,
+      "loop": false,
+      "notes": "Texte libre",
+      "state": "pending | next | played",
+      "hidden": false,
+      "filepath": "chemin/relatif/depuis/racine.mp3"
+    }
+  ],
+  "pads": [
+    {
+      "id": "...",
+      "type": "music | fx | ambiance | loop",
+      "name": "Nom",
+      "vol": 0.8,
+      "emoji": "🔔",
+      "filepath": "nom-du-fichier.mp3"
+    }
+  ]
+}
+```
+
+**Champs notables** :
+- `state` : jamais `"playing"` en JSON (normalisé en `"pending"` à la sauvegarde)
+- `_prevState` : champ runtime supprimé avant sauvegarde
+- `filepath` : chemin relatif depuis la racine du type concerné (seq ou pad)
+
+---
+
+### 6.6 Interface utilisateur — Principes
+
+#### Thème
+- Fond très sombre (`#0f0f0f`) pour utilisation en régie faiblement éclairée
+- Accent orange (`#e8a020`) pour les éléments actifs et les actions primaires
+- Toutes les couleurs sont des variables CSS (`--bg`, `--accent`, `--text`…) modifiables via le panneau ⚙
+- Le thème personnalisé est persisté en `localStorage`
+
+#### États visuels des cues
+| État | Rendu |
+|------|-------|
+| `pending` | Carte normale |
+| `next` | Bordure verte — "prêt à jouer" |
+| `playing` | Bordure orange + fond teinté |
+| `paused` | Bordure bleue |
+| `played` | Opacité réduite |
+
+#### Mode édition
+Activé par **✏ Éditer** dans l'en-tête de la séquence. Ajoute la classe `.edit-mode-active` sur `.col-seq`, ce qui déclenche via CSS l'affichage des boutons de réordonnancement, modification et suppression. Les boutons **＋** et **+ Section** apparaissent dans le même en-tête.
+
+#### Modale d'édition
+Sheet remontant du bas (pattern mobile-first). Contenu unique — pas d'onglets. Regroupement visuel par blocs (`form-group`) pour les paramètres liés :
+- Bloc **Timing** : fade in · fade out · boucle
+- Bloc **Plage** : début · fin
+
+#### Colonne Notes + diviseur glissable
+- Largeur contrôlée par la variable CSS `--seq-pct` posée sur `.seq-body`
+- Le diviseur `.seq-divider` est en `position: absolute` sur `.seq-body` — il reste fixe pendant le scroll
+- La position est sauvegardée en `localStorage` (`impromusic-seq-pct`)
+
+---
+
+### 6.7 Journal des erreurs (logger)
+
+IIFE en tête de script, initialise avant tout autre module.  
+Conserve les 200 dernières entrées en mémoire (tableau circulaire via `shift()`).  
+Accessible via le bouton 🪲 — badge rouge si au moins une entrée `ERROR`.
+
+Les points de log sont :
+- Fichier audio introuvable au play (`[playDirectCue]`, `[triggerPad]`)
+- Sons manquants au chargement (`[preload]`)
+- Erreurs d'ouverture/sauvegarde de projet
+- Erreurs d'import de fichier
+
+---
+
+### 6.8 Sauvegarde projet — Trois modes
+
+```
+1. projectFile._handle défini (fichier ouvert)
+   → createWritable() + write() directement dans le fichier
+
+2. window.showSaveFilePicker disponible (Chrome desktop)
+   → picker "Enregistrer sous" → _handle mémorisé
+
+3. Fallback (Chrome Android sans File System Access)
+   → téléchargement automatique du fichier JSON
+```
+
+L'`autoSave()` écrit silencieusement dans le mode 1 à chaque modification (ajout, déplacement, loop, notes…). Il met aussi à jour le cache `localStorage` (`impromusic-last-project`) pour restaurer l'état après un rechargement de page.
 
 ---
 

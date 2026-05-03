@@ -42,6 +42,10 @@
 - JSDoc obligatoire sur les fonctions exportées : paramètres, retour, erreurs possibles
 - Mettre à jour USERGUIDE.md pour toute modification visible par l'utilisateur
 
+## REPOSITORY
+- GitHub : https://github.com/FrancoisSA/impro-music
+- Remote : git@github.com:FrancoisSA/impro-music.git (ou HTTPS)
+
 ## RELEASE
 Lorsque je te demande de faire une release :
  - Relis le code pour trouver des problèmes de performance ou de sécurité et demande avant de modifier

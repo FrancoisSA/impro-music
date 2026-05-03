@@ -196,14 +196,92 @@
     gap: 0;
   }
 
-  /* ── COLONNE GAUCHE : séquentielle ── */
+  /* ── COLONNE SÉQUENCE + NOTES ── */
   .col-seq {
     display: flex;
     flex-direction: column;
-    width: 52%;
-    border-right: 1px solid var(--border);
+    flex: 1;          /* largeur variable */
     overflow: hidden;
   }
+
+  /* Wrapper qui contient le scroll unique et le diviseur */
+  .seq-body {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Scroll unique — contient toutes les lignes seq+notes */
+  .seq-rows {
+    overflow-y: auto;
+    height: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  .seq-rows::-webkit-scrollbar { width: 3px; }
+  .seq-rows::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Chaque ligne = [cue | note] */
+  .seq-row {
+    display: flex;
+    align-items: stretch;
+  }
+
+  /* Cellule cue — largeur contrôlée par --seq-pct */
+  .seq-cell {
+    flex-shrink: 0;
+    width: var(--seq-pct, 58%);
+    padding: 0 8px 0 8px;
+    padding-top: 4px;
+  }
+  .seq-cell:last-child { padding-bottom: 8px; }
+
+  /* Cellule notes — prend le reste */
+  .note-cell {
+    flex: 1;
+    padding: 4px 8px 0 6px;
+    border-left: 1px solid var(--border);
+    min-width: 0;
+  }
+
+  /* Carte note — même apparence que .cue-item mais sobre */
+  .note-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Titre de la colonne Notes */
+  .notes-col-header {
+    flex-shrink: 0;
+    padding: 7px 12px 5px 10px;
+    border-left: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+  }
+
+  /* Diviseur glissable */
+  .seq-divider {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: calc(var(--seq-pct, 58%) - 3px);
+    width: 6px;
+    cursor: col-resize;
+    z-index: 20;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .seq-divider:hover, .seq-divider.dragging { background: var(--accent-glow); }
 
   .col-header {
     padding: 7px 12px 5px;
@@ -519,6 +597,23 @@
   }
   .btn-folder:active { background: var(--border); }
 
+  /* Menu déroulant Spectacle */
+  .dropdown { position: relative; display: inline-block; }
+  .dropdown-menu {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 500;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); min-width: 160px;
+    box-shadow: 0 6px 18px var(--shadow); overflow: hidden;
+  }
+  .dropdown.open .dropdown-menu { display: block; }
+  .dropdown-item {
+    display: block; width: 100%; padding: 9px 14px; text-align: left;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    background: none; border: none; color: var(--text); white-space: nowrap;
+  }
+  .dropdown-item:hover { background: var(--border); }
+  .dropdown-sep { height: 1px; background: var(--border); margin: 2px 0; }
+
   /* Modal import dossier */
   .import-overlay {
     display: none; position: fixed; inset: 0;
@@ -576,22 +671,77 @@
   .modal-sheet {
     background: var(--surface); border-radius: 18px 18px 0 0;
     border-top: 1px solid var(--border); width: 100%;
-    padding: 20px 20px 40px; max-height: 80dvh; overflow-y: auto;
+    padding: 16px 18px 36px; max-height: 88dvh; overflow-y: auto;
   }
-  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
-  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; color: var(--accent); }
+  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 14px; }
+
+  /* En-tête : titre + type inline */
+  .modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .modal-title { font-size: 16px; font-weight: 700; color: var(--accent); flex: 1; }
+  .field-type-select {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text); font-size: 13px;
+    padding: 5px 8px; outline: none; cursor: pointer; flex-shrink: 0;
+  }
+  .field-type-select:focus { border-color: var(--accent); }
+
   .form-field { margin-bottom: 14px; }
-  .form-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: block; }
+  .form-label {
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.6px; font-weight: 700; margin-bottom: 5px; display: block;
+  }
   .form-input {
     width: 100%; background: var(--surface2); border: 1px solid var(--border);
     border-radius: var(--radius-sm); color: var(--text); font-size: 15px; padding: 9px 11px; outline: none;
   }
   .form-input:focus { border-color: var(--accent); }
+  textarea.form-input { resize: vertical; min-height: 72px; line-height: 1.5; font-family: inherit; }
   .form-row { display: flex; gap: 10px; }
   .form-row .form-field { flex: 1; }
-  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
-  .btn-primary { flex: 1; background: var(--accent); color: var(--on-accent); border: none; border-radius: var(--radius-sm); padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
-  .btn-secondary { flex: 1; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; font-size: 15px; cursor: pointer; }
+
+  /* Slider volume */
+  .vol-row { display: flex; align-items: center; gap: 10px; }
+  .vol-row input[type=range] {
+    flex: 1; accent-color: var(--accent); height: 4px; cursor: pointer;
+  }
+  .vol-value {
+    font-size: 13px; font-weight: 700; color: var(--accent);
+    min-width: 36px; text-align: right;
+  }
+
+  /* Bloc regroupé (timing, plage) */
+  .form-group {
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px 12px 4px; margin-bottom: 14px; background: var(--surface2);
+  }
+  .form-group-title {
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.6px; font-weight: 700; margin-bottom: 10px;
+  }
+  .form-group .form-field { margin-bottom: 10px; }
+  .form-group .form-label { color: var(--text-dim); }
+
+  /* Champ avec unité */
+  .input-unit-wrap { position: relative; }
+  .input-unit-wrap .form-input { padding-right: 30px; }
+  .input-unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-muted); pointer-events: none; }
+
+  /* Checkbox loop */
+  .loop-check-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0 2px;
+  }
+  .loop-check-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; cursor: pointer; }
+  .loop-check-row label { font-size: 13px; color: var(--text-dim); cursor: pointer; }
+
+  /* Fichier audio */
+  .file-row { display: flex; align-items: center; gap: 10px; }
+  .file-name { flex: 1; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-name.has-file { color: var(--text); }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-primary { flex: 1; background: var(--accent); color: var(--on-accent); border: none; border-radius: var(--radius-sm); padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn-secondary { flex: 1; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 13px; font-size: 15px; cursor: pointer; }
 
   /* ── TOAST ── */
   .toast {
@@ -675,11 +825,19 @@
   <div class="app-title">🎵 ImproMusic</div>
   <div class="project-name">—</div>
   <div style="display:flex;gap:6px;">
-    <button class="btn-folder" onclick="openProjectFile()" title="Ouvrir un spectacle (.json)">📂 Ouvrir</button>
-    <button class="btn-folder" onclick="saveProjectFile()" title="Enregistrer le spectacle en JSON">💾 Enregistrer</button>
-    <button class="btn-folder" onclick="openFolderImport()" title="Importer un dossier audio">🎵 Sons</button>
-    <button class="btn-icon" onclick="openAddModal('seq')" title="Ajouter cue séquentiel">+Seq</button>
-    <button class="btn-icon" onclick="openAddModal('pad')" title="Ajouter bouton libre">+Pad</button>
+    <div class="dropdown" id="menuSpectacle">
+      <button class="btn-folder" onclick="toggleMenu('menuSpectacle')">🎭 Spectacle ▾</button>
+      <div class="dropdown-menu">
+        <button class="dropdown-item" onclick="newProject();closeMenu()">✦ Nouveau</button>
+        <div class="dropdown-sep"></div>
+        <button class="dropdown-item" onclick="openProjectFile();closeMenu()">📂 Charger</button>
+        <button class="dropdown-item" onclick="saveProjectFile();closeMenu()">💾 Sauvegarder</button>
+        <div class="dropdown-sep"></div>
+        <button class="dropdown-item" onclick="openFolderImport();closeMenu()">🎵 Importer un dossier audio</button>
+      </div>
+    </div>
+    <button class="btn-icon" onclick="openAddModal('pad')" title="Ajouter son libre" style="display:none">+Pad</button>
+    <button class="btn-icon" id="btnLog" onclick="openLogPanel()" title="Journal des erreurs">🪲</button>
     <button class="btn-icon" onclick="openThemePanel()" title="Couleurs & thème">⚙</button>
     <div class="vol-compact" title="Volume master">
       <span class="vol-icon">🔊</span>
@@ -732,19 +890,25 @@
 
   <!-- COLONNE GAUCHE : séquentielle -->
   <div class="col-seq">
-    <div class="col-header">
-      <span class="col-title">Séquence</span>
-      <span class="col-badge" id="cueCount">0</span>
-      <button class="btn-add-section" id="btnAddSection" onclick="addSection()">+ Section</button>
-      <button class="btn-edit-mode" id="btnEditMode" onclick="toggleEditMode()">✏ Éditer</button>
+    <div style="display:flex">
+      <div class="col-header" style="flex:1;border-right:none">
+        <span class="col-title">Séquence</span>
+        <span class="col-badge" id="cueCount">0</span>
+        <button class="btn-add-section" id="btnAddCue"     onclick="openAddModal('seq')" title="Ajouter un cue">＋</button>
+        <button class="btn-add-section" id="btnAddSection" onclick="addSection()">+ Section</button>
+        <button class="btn-edit-mode" id="btnEditMode" onclick="toggleEditMode()">✏ Éditer</button>
+      </div>
+      <div class="notes-col-header">Notes</div>
     </div>
 
-    <!-- Liste -->
-    <div class="cue-list" id="cueList"></div>
+    <div class="seq-body" id="seqBody">
+      <div class="seq-rows" id="seqRows"></div>
+      <div class="seq-divider" id="seqDivider"></div>
+    </div>
   </div>
 
   <!-- COLONNE DROITE : pads libres -->
-  <div class="col-pads">
+  <div class="col-pads" style="display:none">
     <div class="pads-col-header">
       <span class="col-title">Sons libres</span>
       <span class="col-badge" id="padCount">9</span>
@@ -759,64 +923,91 @@
 <div class="modal-overlay" id="addModal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="modalTitle">Nouveau cue</div>
 
+    <!-- En-tête : titre + sélecteur de type -->
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Nouveau cue</div>
+      <select class="field-type-select" id="fieldType">
+        <option value="music">🎵 Musique</option>
+        <option value="fx">💥 Effet</option>
+        <option value="ambiance">🌿 Ambiance</option>
+        <option value="loop">🔁 Boucle</option>
+      </select>
+    </div>
+
+    <!-- Nom -->
     <div class="form-field">
       <label class="form-label">Nom</label>
-      <input class="form-input" id="fieldName" type="text" placeholder="Ex: Entrée du héros">
+      <input class="form-input" id="fieldName" type="text" placeholder="Ex : Entrée du héros" autocomplete="off">
     </div>
-    <div class="form-row">
-      <div class="form-field">
-        <label class="form-label">Type</label>
-        <select class="form-input" id="fieldType">
-          <option value="music">🎵 Musique</option>
-          <option value="fx">💥 Effet sonore</option>
-          <option value="ambiance">🌿 Ambiance</option>
-          <option value="loop">🔁 Boucle</option>
-        </select>
-      </div>
-      <div class="form-field">
-        <label class="form-label">Volume %</label>
-        <input class="form-input" id="fieldVol" type="number" min="0" max="100" value="80">
+
+    <!-- Volume (slider) -->
+    <div class="form-field">
+      <label class="form-label">Volume</label>
+      <div class="vol-row">
+        <input type="range" id="fieldVol" min="0" max="100" value="80"
+          oninput="document.getElementById('fieldVolVal').textContent=this.value+'%'">
+        <span class="vol-value" id="fieldVolVal">80%</span>
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-field">
-        <label class="form-label">Fade in (s)</label>
-        <input class="form-input" id="fieldFadeIn" type="number" min="0" max="30" value="0" step="0.5">
+
+    <!-- Bloc Timing : fade in/out + boucle -->
+    <div class="form-group" id="fieldTimingGroup">
+      <div class="form-group-title">↗↘ Timing</div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="form-label">Fade in</label>
+          <div class="input-unit-wrap">
+            <input class="form-input" id="fieldFadeIn" type="number" min="0" max="30" value="0" step="0.5">
+            <span class="input-unit">s</span>
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Fade out</label>
+          <div class="input-unit-wrap">
+            <input class="form-input" id="fieldFadeOut" type="number" min="0" max="30" value="2" step="0.5">
+            <span class="input-unit">s</span>
+          </div>
+        </div>
       </div>
-      <div class="form-field">
-        <label class="form-label">Fade out (s)</label>
-        <input class="form-input" id="fieldFadeOut" type="number" min="0" max="30" value="2" step="0.5">
+      <div class="loop-check-row" id="fieldLoopRow">
+        <input type="checkbox" id="fieldLoop">
+        <label for="fieldLoop">Boucle — rejouer en fin de piste</label>
       </div>
     </div>
-    <div class="form-field" id="fieldStartAtRow">
-      <label class="form-label">Démarrer à (mm:ss) <span style="color:var(--text-muted);font-weight:400;text-transform:none">— laisser vide pour le début</span></label>
-      <input class="form-input" id="fieldStartAt" type="text" placeholder="ex: 1:30" pattern="[0-9]+:[0-5][0-9]">
+
+    <!-- Bloc Plage : début / fin -->
+    <div class="form-group" id="fieldRangeGroup">
+      <div class="form-group-title">↦↤ Plage de lecture</div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="form-label">Débuter à</label>
+          <input class="form-input" id="fieldStartAt" type="text" placeholder="0:00">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Finir à <span style="font-weight:400;text-transform:none;color:var(--text-muted)">ou -30s</span></label>
+          <input class="form-input" id="fieldEndAt" type="text" placeholder="fin naturelle">
+        </div>
+      </div>
     </div>
-    <div class="form-field" id="fieldEndAtRow">
-      <label class="form-label">Finir à <span style="color:var(--text-muted);font-weight:400;text-transform:none">— mm:ss (position) ou -30 (30s avant la fin)</span></label>
-      <input class="form-input" id="fieldEndAt" type="text" placeholder="ex: 2:45  ou  -30">
-    </div>
+
+    <!-- Fichier audio -->
     <div class="form-field">
       <label class="form-label">Fichier audio</label>
-      <div id="fieldCurrentFile" style="font-size:11px;color:var(--text-muted);margin-bottom:5px;display:none;"></div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button type="button" class="btn-secondary" style="padding:8px 12px;font-size:13px;flex-shrink:0;" onclick="pickAudioFile()">📂 Choisir…</button>
-        <span id="fieldFileName" style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Aucun fichier</span>
+      <div class="file-row">
+        <button type="button" class="btn-secondary" style="flex:none;padding:8px 14px;font-size:13px;" onclick="pickAudioFile()">📂 Choisir…</button>
+        <span class="file-name" id="fieldFileName">Aucun fichier</span>
       </div>
       <input id="fieldFile" type="file" accept="audio/*" style="display:none">
+      <div id="fieldCurrentFile" style="font-size:11px;color:var(--text-muted);margin-top:5px;display:none;"></div>
     </div>
-    <div class="form-field" id="fieldLoopRow">
-      <label class="form-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-        <input type="checkbox" id="fieldLoop" style="width:18px;height:18px;accent-color:var(--accent);">
-        Boucle (loop) — rejouer automatiquement en fin de piste
-      </label>
-    </div>
+
+    <!-- Notes de mise en scène -->
     <div class="form-field">
-      <label class="form-label">Notes</label>
-      <input class="form-input" id="fieldNotes" type="text" placeholder="Ex: Attendre la sortie du comédien">
+      <label class="form-label">Notes de mise en scène</label>
+      <textarea class="form-input" id="fieldNotes" placeholder="Ex : Attendre la sortie du comédien avant de lancer…" rows="3"></textarea>
     </div>
+
     <div class="modal-actions">
       <button class="btn-secondary" onclick="closeModal()">Annuler</button>
       <button class="btn-primary" id="btnModalAdd" onclick="submitModal()">Ajouter</button>
@@ -857,6 +1048,23 @@
 <div class="toast" id="toast"></div>
 
 <!-- PANNEAU THÈME -->
+<div class="theme-overlay" id="logOverlay" onclick="closeLogPanel()"></div>
+<div class="theme-panel" id="logPanel" style="max-width:600px">
+  <div class="theme-header">
+    <span class="theme-title">🪲 Journal des erreurs</span>
+    <button class="theme-close" onclick="closeLogPanel()">✕</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <button class="btn-icon" onclick="renderLogPanel()" style="font-size:13px">↺ Actualiser</button>
+    <button class="btn-icon" onclick="logger.clear();renderLogPanel()" style="font-size:13px">🗑 Vider</button>
+  </div>
+  <div id="logEntries" style="
+    font-family:monospace;font-size:12px;line-height:1.6;
+    overflow-y:auto;max-height:60vh;
+    background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;
+  "></div>
+</div>
+
 <div class="theme-overlay" id="themeOverlay" onclick="closeThemePanel()"></div>
 <div class="theme-panel" id="themePanel">
   <div class="theme-header">
@@ -898,13 +1106,89 @@
 
 <script>
   // ════════════════════════════════════════════════
+  // LOGGER — journal des erreurs en mémoire
+  // Accessible via le bouton 🪲 dans l'en-tête.
+  // Conserve les MAX_LOG dernières entrées.
+  // ════════════════════════════════════════════════
+  const logger = (() => {
+    const MAX_LOG = 200;
+    const entries = []; // { ts, level, msg }
+
+    function _push(level, msg) {
+      entries.push({ ts: new Date().toISOString(), level, msg });
+      if (entries.length > MAX_LOG) entries.shift();
+    }
+
+    return {
+      error: (msg, err) => _push('ERROR', err ? msg + ' — ' + (err.message ?? err) : msg),
+      warn:  (msg)      => _push('WARN',  msg),
+      info:  (msg)      => _push('INFO',  msg),
+      all:   ()         => [...entries],
+      clear: ()         => { entries.length = 0; },
+    };
+  })();
+
+  // ════════════════════════════════════════════════
   // HANDLES AUDIO — mémoire session uniquement
-  // Map<id, FileSystemFileHandle> — aucune persistance.
-  // Peuplée à l'import dossier ou à la sélection
-  // d'un fichier individuel. Perdue au rechargement
-  // → l'utilisateur re-sélectionne le dossier.
+  // Map<id, FileSystemFileHandle>
+  // Peuplée depuis les dossiers persistés (IDB) ou
+  // à l'import manuel. Perdue au rechargement mais
+  // reconstituée automatiquement via audioDirStore.
   // ════════════════════════════════════════════════
   const audioHandles = new Map(); // id (string) → FileSystemFileHandle
+
+  // ════════════════════════════════════════════════
+  // DOSSIER RACINE AUDIO — persistance IndexedDB
+  // Deux handles distincts : 'rootSeq' (séquence)
+  // et 'rootPads' (sons libres).
+  // filepath = chemin relatif depuis la racine
+  // du type concerné.
+  // requestPermission() = 1 clic au rechargement.
+  // ════════════════════════════════════════════════
+  const audioDirStore = (() => {
+    const DB    = 'impromusic-dirs';
+    const STORE = 'dirs';
+
+    function _open() {
+      return new Promise((res, rej) => {
+        const req = indexedDB.open(DB, 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+        req.onsuccess = e => res(e.target.result);
+        req.onerror = () => rej(req.error);
+      });
+    }
+
+    async function get(key) {
+      const db = await _open();
+      return new Promise(res => {
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
+        req.onsuccess = () => { db.close(); res(req.result ?? null); };
+        req.onerror  = () => { db.close(); res(null); };
+      });
+    }
+
+    async function set(key, handle) {
+      const db = await _open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(handle, key);
+        tx.oncomplete = () => { db.close(); res(); };
+        tx.onerror    = () => { db.close(); rej(tx.error); };
+      });
+    }
+
+    async function clear(key) {
+      const db = await _open();
+      return new Promise(res => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).delete(key);
+        tx.oncomplete = () => { db.close(); res(); };
+        tx.onerror    = () => { db.close(); res(); };
+      });
+    }
+
+    return { get, set, clear };
+  })();
 
   // ════════════════════════════════════════════════
   // PROJETS — fichier JSON sur le disque
@@ -946,29 +1230,43 @@
       });
     }
 
-    // Enregistre dans le fichier ouvert (ou ouvre le picker si premier enregistrement)
+    async function _writeHandle(data) {
+      const perm = await _handle.queryPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') await _handle.requestPermission({ mode: 'readwrite' });
+      const writable = await _handle.createWritable();
+      await writable.write(JSON.stringify(data, null, 2));
+      await writable.close();
+      return (await _handle.getFile()).name.replace(/\.json$/i, '');
+    }
+
+    // Enregistre dans le fichier ouvert, ou ouvre un picker, ou télécharge en fallback.
     async function save(data, suggestedName) {
-      if (window.showSaveFilePicker) {
+      // Cas 1 : fichier déjà ouvert → écriture directe dans ce fichier
+      if (_handle) {
         try {
-          if (!_handle) {
-            _handle = await window.showSaveFilePicker({
-              suggestedName: (suggestedName || 'spectacle') + '.json',
-              types: [{ description: 'Projet ImproMusic', accept: { 'application/json': ['.json'] } }],
-            });
-          }
-          const writable = await _handle.createWritable();
-          await writable.write(JSON.stringify(data, null, 2));
-          await writable.close();
-          const file = await _handle.getFile();
-          return file.name.replace(/\.json$/i, '');
+          return await _writeHandle(data);
         } catch(e) {
           if (e.name === 'AbortError') return null;
-          // En cas d'erreur (ex: permission révoquée), forcer le re-pick
+          _handle = null; // permission révoquée → retombe sur le picker
+        }
+      }
+
+      // Cas 2 : nouveau fichier → picker "Enregistrer sous"
+      if (window.showSaveFilePicker) {
+        try {
+          _handle = await window.showSaveFilePicker({
+            suggestedName: (suggestedName || 'spectacle') + '.json',
+            types: [{ description: 'Projet ImproMusic', accept: { 'application/json': ['.json'] } }],
+          });
+          return await _writeHandle(data);
+        } catch(e) {
+          if (e.name === 'AbortError') return null;
           _handle = null;
           throw e;
         }
       }
-      // Fallback : téléchargement
+
+      // Cas 3 : fallback téléchargement (Android / navigateurs sans File System Access)
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
@@ -987,6 +1285,10 @@
 
   // ════════════════════════════════════════════════
   // MOTEUR AUDIO — Web Audio API
+  // Un seul AudioBufferSourceNode actif à la fois
+  // (cue séquence OU pad, jamais les deux).
+  // Les buffers sont gardés en mémoire toute la
+  // session — pas de re-décode entre les plays.
   // ════════════════════════════════════════════════
   const engine = (() => {
     let ctx = null;
@@ -1018,7 +1320,13 @@
     // Charge un File (objet File du navigateur) → décode en AudioBuffer
     async function loadFile(id, file) {
       _ensureCtx();
-      const ab      = await file.arrayBuffer();
+      const ab = await file.arrayBuffer();
+      return loadBuffer(id, ab);
+    }
+
+    // Charge directement un ArrayBuffer (ex: issu de fetch) → décode en AudioBuffer
+    async function loadBuffer(id, ab) {
+      _ensureCtx();
       const decoded = await ctx.decodeAudioData(ab);
       buffers.set(String(id), decoded);
       return decoded;
@@ -1114,6 +1422,7 @@
         const c = ctx;
         const now = c.currentTime;
         activeGain.gain.cancelScheduledValues(now);
+        // setValueAtTime ancre la valeur courante avant le ramp (requis par la spec Web Audio)
         activeGain.gain.setValueAtTime(activeGain.gain.value, now);
         activeGain.gain.linearRampToValueAtTime(0.0001, now + fadeOut);
         const src = activeSource;
@@ -1122,6 +1431,8 @@
         activeSource = null;
         activeGain   = null;
         pausedOffset = null;
+        // +0.1s de marge pour laisser le ramp se terminer avant d'arrêter la source.
+        // try/catch car la source peut déjà être arrêtée par onended entre-temps.
         setTimeout(() => { try { src.stop(); } catch(_){} }, (fadeOut + 0.1) * 1000);
       } else {
         _hardStop();
@@ -1179,7 +1490,7 @@
     function clearBuffer(id) { buffers.delete(String(id)); }
 
     return {
-      loadFile, hasBuffer, getDuration, _copyBuffer: copyBuffer,
+      loadFile, loadBuffer, hasBuffer, getDuration, _copyBuffer: copyBuffer,
       play, stop, pause, resume,
       getElapsed, setMasterVolume,
       isPlaying, isPaused, currentId,
@@ -1449,7 +1760,9 @@
 
     const cue = cues[nextIdx];
     cue.state = 'playing';
-    if (nextIdx + 1 < cues.length) cues[nextIdx + 1].state = 'next';
+    // Cherche le prochain cue jouable (non-section, non-masqué) pour le pré-sélectionner
+    const afterIdx = cues.findIndex((c, i) => i > nextIdx && c.type !== 'section' && !c.hidden);
+    if (afterIdx >= 0) cues[afterIdx].state = 'next';
     currentCue = cue;
     currentPad = null;
 
@@ -1465,6 +1778,7 @@
     }, () => onCueEnded(cue));
 
     if (!hasAudio) {
+      logger.error('[handleGo] Buffer manquant : ' + cue.name); _updateLogBadge();
       showToast('⚠ Aucun fichier audio pour : ' + cue.name);
       updateNpBar('idle');
     } else {
@@ -1522,7 +1836,7 @@
   }
 
   // ── Jouer un cue directement (hors séquence) ──
-  function playDirectCue(cue) {
+  async function playDirectCue(cue) {
     engine.ensureCtx();
     requestWakeLock();
 
@@ -1546,6 +1860,17 @@
       return;
     }
 
+    // Chargement à la demande si le buffer n'est pas encore prêt
+    if (!engine.hasBuffer(cue.id)) {
+      if (!cue.filepath) { logger.warn('[playDirectCue] Pas de filepath : ' + cue.name); _updateLogBadge(); showToast('⚠ Aucun fichier pour : ' + cue.name); return; }
+      showToast('⏳ Chargement…');
+      const ok = await _loadOnDemand(cue.id, cue.filepath, 'seq');
+      if (!ok) { logger.error('[playDirectCue] Fichier introuvable : ' + cue.filepath); _updateLogBadge(); showToast('⚠ Fichier introuvable : ' + cue.name); return; }
+    }
+
+    // _prevState = sauvegarde de l'état avant la tentative de lecture.
+    // Permet de rétablir l'état d'origine si le play échoue (pas de fichier).
+    // Supprimé en fin de lecture naturelle ou après rétablissement.
     cue._prevState = cue.state;
     stopAll();
     // Reset any cue stuck in 'playing' or 'next' state from the previous playback
@@ -1568,6 +1893,7 @@
     });
 
     if (!ok) {
+      logger.error('[playDirectCue] engine.play échoué : ' + cue.name); _updateLogBadge();
       showToast('⚠ Aucun fichier pour : ' + cue.name);
       cue.state = cue._prevState ?? 'pending';
       delete cue._prevState;
@@ -1613,6 +1939,7 @@
       colSeq.classList.remove('edit-mode-active');
     }
     renderCueList();
+    renderPads();
   }
 
   function addSection() {
@@ -1632,25 +1959,27 @@
     renderCueList();
   }
 
+  function _setVolSlider(val) {
+    document.getElementById('fieldVol').value = val;
+    document.getElementById('fieldVolVal').textContent = val + '%';
+  }
+
   function openEditCue(cueId) {
     editingCueId = cueId;
     const cue = cues.find(c => c.id === cueId);
     if (!cue) return;
 
-    document.getElementById('modalTitle').textContent = 'Modifier le cue';
+    document.getElementById('modalTitle').textContent = cue.name;
     document.getElementById('fieldName').value    = cue.name;
     document.getElementById('fieldType').value    = cue.type;
-    document.getElementById('fieldVol').value     = Math.round(cue.vol * 100);
+    _setVolSlider(Math.round(cue.vol * 100));
     document.getElementById('fieldFadeIn').value  = cue.fadeIn;
     document.getElementById('fieldFadeOut').value = cue.fadeOut;
     document.getElementById('fieldStartAt').value = cue.startAt > 0 ? secToMmss(cue.startAt) : '';
     document.getElementById('fieldEndAt').value   = cue.endAt
       ? (cue.endAt < 0 ? String(cue.endAt) : secToMmss(cue.endAt)) : '';
     document.getElementById('fieldLoop').checked  = !!(cue.loop ?? (cue.type === 'loop'));
-    document.getElementById('fieldNotes').value   = cue.notes;
-    document.getElementById('fieldStartAtRow').style.display = '';
-    document.getElementById('fieldEndAtRow').style.display   = '';
-    document.getElementById('fieldLoopRow').style.display    = '';
+    document.getElementById('fieldNotes').value   = cue.notes ?? '';
     const curFile = document.getElementById('fieldCurrentFile');
     if (cue.filepath) {
       curFile.textContent = '📎 ' + cue.filepath;
@@ -1658,7 +1987,9 @@
     } else {
       curFile.style.display = 'none';
     }
-    document.getElementById('btnModalAdd').textContent = 'Sauvegarder';
+    document.getElementById('fieldFileName').textContent = '';
+    document.getElementById('fieldFileName').className = 'file-name';
+    document.getElementById('btnModalAdd').textContent = '💾 Sauvegarder';
     modalTarget = 'seq';
     document.getElementById('addModal').classList.add('open');
   }
@@ -1687,8 +2018,11 @@
     const idx = cues.findIndex(c => c.id === cueId);
     if (idx < 0) return;
     const name = cues[idx].name;
+    const deletedCue = cues[idx];
+    // Si ce cue était en cours de lecture, arrêter le son proprement
+    if (deletedCue.state === 'playing' || currentCue?.id === deletedCue.id) stopAll();
     // Si ce cue était "next", passer le suivant visible en "next"
-    if (cues[idx].state === 'next') {
+    if (deletedCue.state === 'next') {
       const nextVisible = cues.find((c, i) => i > idx && !c.hidden && c.state === 'pending');
       if (nextVisible) nextVisible.state = 'next';
     }
@@ -1721,7 +2055,7 @@
   // ════════════════════════════════════════════════
   // PADS
   // ════════════════════════════════════════════════
-  function triggerPad(pad) {
+  async function triggerPad(pad) {
     engine.ensureCtx();
     requestWakeLock();
 
@@ -1732,6 +2066,14 @@
       renderCueList();
       renderPads();
       return;
+    }
+
+    // Chargement à la demande si le buffer n'est pas encore prêt
+    if (!engine.hasBuffer(pad.id)) {
+      if (!pad.filepath) { logger.warn('[triggerPad] Pas de filepath : ' + pad.name); _updateLogBadge(); showToast('⚠ Aucun fichier pour : ' + pad.name); return; }
+      showToast('⏳ Chargement…');
+      const ok = await _loadOnDemand(pad.id, pad.filepath, 'pad');
+      if (!ok) { logger.error('[triggerPad] Fichier introuvable : ' + pad.filepath); _updateLogBadge(); showToast('⚠ Fichier introuvable : ' + pad.name); return; }
     }
 
     stopAll();
@@ -1760,10 +2102,40 @@
   }
 
   // ════════════════════════════════════════════════
-  // RENDU
+  // RENDU — COLONNE SÉQUENCE + NOTES
+  // Chaque cue est rendu dans une `.seq-row` qui
+  // contient deux cellules côte à côte :
+  //   • .seq-cell  → carte du cue (gauche)
+  //   • .note-cell → carte de note (droite)
+  // Un seul scroll container garantit l'alignement
+  // sans synchronisation manuelle entre deux listes.
+  // La largeur relative est contrôlée par --seq-pct
+  // (CSS var) mis à jour par le diviseur glissable.
   // ════════════════════════════════════════════════
+  function _makeRow(mainEl, noteText) {
+    const row = document.createElement('div');
+    row.className = 'seq-row';
+
+    const seqCell = document.createElement('div');
+    seqCell.className = 'seq-cell';
+    seqCell.appendChild(mainEl);
+
+    const noteCell = document.createElement('div');
+    noteCell.className = 'note-cell';
+    if (noteText) {
+      const card = document.createElement('div');
+      card.className = 'note-card';
+      card.textContent = noteText;
+      noteCell.appendChild(card);
+    }
+
+    row.appendChild(seqCell);
+    row.appendChild(noteCell);
+    return row;
+  }
+
   function renderCueList() {
-    const list = document.getElementById('cueList');
+    const list = document.getElementById('seqRows');
     list.innerHTML = '';
 
     let sectionCollapsed = false;
@@ -1785,7 +2157,7 @@
         if (editMode) {
           sep.innerHTML = `
             <span class="section-chevron">▾</span>
-            <span class="section-title" id="st_${cue.id}">${cue.name}</span>
+            <span class="section-title">${cue.name}</span>
             <div class="section-line"></div>
             <div class="section-edit-actions">
               <button class="ea-btn ea-up"   title="Monter">↑</button>
@@ -1796,7 +2168,8 @@
           sep.querySelector('.ea-up').addEventListener('click',     e => { e.stopPropagation(); moveCue(i, -1); });
           sep.querySelector('.ea-down').addEventListener('click',   e => { e.stopPropagation(); moveCue(i, +1); });
           sep.querySelector('.ea-edit').addEventListener('click',   e => { e.stopPropagation(); renameSection(cue); });
-          sep.querySelector('.ea-delete').addEventListener('click', e => { e.stopPropagation(); cues.splice(i, 1); autoSave(); renderCueList(); });
+          // Recherche par id pour éviter le bug d'index décalé si une suppression précédente a eu lieu
+          sep.querySelector('.ea-delete').addEventListener('click', e => { e.stopPropagation(); const si = cues.findIndex(c => c.id === cue.id); if (si >= 0) { cues.splice(si, 1); autoSave(); renderCueList(); } });
         } else {
           sep.innerHTML = `
             <span class="section-chevron">▾</span>
@@ -1809,7 +2182,7 @@
             renderCueList();
           });
         }
-        list.appendChild(sep);
+        list.appendChild(_makeRow(sep, null));
         return;
       }
 
@@ -1901,7 +2274,6 @@
               <span class="cue-tag tag-${cue.type}">${typeEmojis[cue.type]} ${cue.type}</span>
               ${startLabel ? `<span class="start-at-badge">${startLabel}</span>` : ''}
               ${loopOn ? `<span class="loop-badge">🔁 loop</span>` : ''}
-              <span>${cue.notes}</span>
             </div>
           </div>
           <div class="cue-duration">${durLabel}</div>
@@ -1924,7 +2296,7 @@
         });
       }
 
-      list.appendChild(item);
+      list.appendChild(_makeRow(item, cue.notes || null));
     });
 
     const audioCueCount = cues.filter(c => c.type !== 'section').length;
@@ -1932,7 +2304,7 @@
     updateGoButton();
 
     const active = list.querySelector('.active, .next');
-    if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (active) active.closest('.seq-row')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   function updateGoButton() { /* bouton GO supprimé */ }
@@ -2004,14 +2376,27 @@
   // ════════════════════════════════════════════════
   function openAddModal(target) {
     modalTarget = target;
+    editingCueId = null;
     document.getElementById('modalTitle').textContent =
-      target === 'seq' ? 'Nouveau cue séquentiel' : 'Nouveau son libre';
-    document.getElementById('fieldStartAtRow').style.display = target === 'seq' ? '' : 'none';
-    document.getElementById('fieldEndAtRow').style.display   = target === 'seq' ? '' : 'none';
-    document.getElementById('fieldLoopRow').style.display    = target === 'seq' ? '' : 'none';
-    document.getElementById('fieldLoop').checked = false;
+      target === 'seq' ? 'Nouveau cue' : 'Nouveau son libre';
+    document.getElementById('fieldName').value    = '';
+    document.getElementById('fieldType').value    = 'music';
+    _setVolSlider(80);
+    document.getElementById('fieldFadeIn').value  = 1;
+    document.getElementById('fieldFadeOut').value = 2;
+    document.getElementById('fieldStartAt').value = '';
+    document.getElementById('fieldEndAt').value   = '';
+    document.getElementById('fieldNotes').value   = '';
+    document.getElementById('fieldLoop').checked  = false;
     document.getElementById('fieldCurrentFile').style.display = 'none';
+    document.getElementById('fieldFileName').textContent = 'Aucun fichier';
+    document.getElementById('fieldFileName').className = 'file-name';
+    const isSeq = target === 'seq';
+    document.getElementById('fieldTimingGroup').style.display = '';
+    document.getElementById('fieldRangeGroup').style.display  = isSeq ? '' : 'none';
+    document.getElementById('btnModalAdd').textContent = '＋ Ajouter';
     document.getElementById('addModal').classList.add('open');
+    document.getElementById('fieldName').focus();
   }
 
   function closeModal() {
@@ -2022,6 +2407,7 @@
     document.getElementById('btnModalAdd').textContent = 'Ajouter';
     document.getElementById('modalTitle').textContent = 'Nouveau cue';
     document.getElementById('fieldFileName').textContent = 'Aucun fichier';
+    document.getElementById('fieldFileName').className = 'file-name';
   }
 
   document.getElementById('addModal').addEventListener('click', function(e) {
@@ -2041,7 +2427,8 @@
         });
         _pendingFileHandle = handle;
         _pendingFile = await handle.getFile();
-        document.getElementById('fieldFileName').textContent = _pendingFile.name;
+        const fn = document.getElementById('fieldFileName');
+        fn.textContent = _pendingFile.name; fn.className = 'file-name has-file';
         // Pré-remplir le nom si le champ est vide
         const nameField = document.getElementById('fieldName');
         if (!nameField.value) nameField.value = cleanFileName(_pendingFile.name);
@@ -2143,6 +2530,47 @@
   // ════════════════════════════════════════════════
   // TOAST
   // ════════════════════════════════════════════════
+  // ════════════════════════════════════════════════
+  // MENU DÉROULANT
+  // ════════════════════════════════════════════════
+  function toggleMenu(id) {
+    const el = document.getElementById(id);
+    const isOpen = el.classList.contains('open');
+    closeMenu();
+    if (!isOpen) {
+      el.classList.add('open');
+      setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+    }
+  }
+
+  function closeMenu() {
+    document.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+  }
+
+  // ════════════════════════════════════════════════
+  // NOUVEAU SPECTACLE
+  // ════════════════════════════════════════════════
+  function newProject() {
+    if (cues.length > 0 || pads.length > 0) {
+      if (!confirm('Créer un nouveau spectacle ? Les modifications non sauvegardées seront perdues.')) return;
+    }
+    stopAll();
+    engine.clearBuffers();
+    audioHandles.clear();
+    cues.length = 0;
+    pads.length = 0;
+    currentProjectName   = null;
+    currentAudioRootSeq  = null;
+    currentAudioRootPads = null;
+    projectFile.clear();
+    localStorage.removeItem('impromusic-last-project');
+    document.querySelector('.project-name').textContent = '—';
+    document.getElementById('loadBanner').classList.add('hidden');
+    renderCueList();
+    renderPads();
+    showToast('✦ Nouveau spectacle');
+  }
+
   function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -2294,27 +2722,63 @@
     return b > 1048576 ? (b/1048576).toFixed(1)+' Mo' : Math.round(b/1024)+' Ko';
   }
 
-  // Handles du dossier en cours (session) : Map<filename, FileSystemFileHandle>
-  let _currentFileHandles = new Map();
+  // ════════════════════════════════════════════════
+  // IMPORT DOSSIER
+  // L'utilisateur choisit un dossier racine.
+  // L'app scanne récursivement tous les sous-dossiers.
+  // Le handle racine est persisté en IDB.
+  // filepath = chemin relatif depuis la racine.
+  // ════════════════════════════════════════════════
+
+  // Map<relativePath, FileSystemFileHandle> — scan du dossier en cours d'import
+  let _importFileMap = new Map();
+  // Handle du dossier sélectionné à l'import, persisté après choix de destination
+  let _pendingImportHandle = null;
+
+  // Scanne récursivement un dossier et retourne Map<relpath, FileHandle>
+  // Les clés sont normalisées en NFC : macOS retourne les noms en NFD (accents
+  // décomposés), ce qui ferait échouer les comparaisons avec les filepath du JSON.
+  async function _scanDir(dirHandle, prefix) {
+    const map = new Map();
+    for await (const entry of dirHandle.values()) {
+      const rawPath = prefix ? prefix + '/' + entry.name : entry.name;
+      const relPath = rawPath.normalize('NFC');
+      if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name)) {
+        map.set(relPath, entry);
+      } else if (entry.kind === 'directory') {
+        const sub = await _scanDir(entry, relPath);
+        for (const [k, v] of sub) map.set(k, v);
+      }
+    }
+    return map;
+  }
 
   async function openFolderImport() {
     importFiles = [];
-    _currentFileHandles = new Map();
+    _importFileMap = new Map();
 
     if (window.showDirectoryPicker) {
+      let rootHandle;
       try {
-        const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
-        for await (const entry of dirHandle.values()) {
-          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name)) {
-            _currentFileHandles.set(entry.name, entry); // garde le FileSystemFileHandle
-            importFiles.push(await entry.getFile());
-          }
-        }
+        rootHandle = await window.showDirectoryPicker({ mode: 'read' });
       } catch(e) {
         if (e.name !== 'AbortError') document.getElementById('folderFileInput').click();
         return;
       }
+
+      // On mémorise le handle — il sera persisté dans le bon store (seq/pad)
+      // une fois que l'utilisateur aura choisi la destination dans la dialog.
+      _pendingImportHandle = rootHandle;
+
+      _importFileMap = await _scanDir(rootHandle, '');
+      for (const [relPath, fileHandle] of _importFileMap) {
+        const file = await fileHandle.getFile();
+        // On attache le chemin relatif au File pour l'utiliser dans l'import
+        Object.defineProperty(file, '_relPath', { value: relPath });
+        importFiles.push(file);
+      }
     } else {
+      // Fallback Android : input webkitdirectory (pas de handles persistants)
       document.getElementById('folderFileInput').click();
       return;
     }
@@ -2325,7 +2789,7 @@
 
   // Fallback : input webkitdirectory (Android sans showDirectoryPicker)
   document.getElementById('folderFileInput').addEventListener('change', function() {
-    _currentFileHandles = new Map();
+    _importFileMap = new Map();
     const files = Array.from(this.files).filter(f => /\.(mp3|wav|ogg|m4a|aac)$/i.test(f.name));
     this.value = '';
     if (!files.length) { showToast('Aucun fichier audio'); return; }
@@ -2370,6 +2834,7 @@
   function closeImport() {
     document.getElementById('importOverlay').classList.remove('open');
     importFiles = [];
+    _pendingImportHandle = null;
   }
 
   async function confirmImport() {
@@ -2383,6 +2848,16 @@
     btn.disabled = true;
 
     engine.ensureCtx();
+
+    // Persiste le handle du dossier dans le bon store maintenant qu'on connaît la destination
+    if (_pendingImportHandle) {
+      const storeKey = importDest === 'pad' ? 'rootPads' : 'rootSeq';
+      await audioDirStore.set(storeKey, _pendingImportHandle);
+      if (importDest === 'pad') currentAudioRootPads = _pendingImportHandle.name;
+      else                      currentAudioRootSeq  = _pendingImportHandle.name;
+      _pendingImportHandle = null;
+    }
+
     let done = 0;
 
     for (const file of selected) {
@@ -2391,8 +2866,10 @@
       const id = 'folder_' + Date.now() + '_' + done;
       try {
         await engine.loadFile(id, file);
-        // Persiste le handle individuel si disponible (import dossier avec showDirectoryPicker)
-        const fileHandle = _currentFileHandles.get(file.name);
+        // filepath = chemin relatif depuis la racine (ex: "PL-RECONSTITUTION/son.mp3")
+        // Normalisation NFC pour cohérence avec _scanDir (macOS retourne NFD)
+        const relPath  = (file._relPath ?? file.name).normalize('NFC');
+        const fileHandle = _importFileMap.get(relPath);
         if (fileHandle) audioHandles.set(String(id), fileHandle);
         if (importDest === 'seq') {
           const isFirst = !cues.some(c => c.state === 'next');
@@ -2400,12 +2877,13 @@
             id, name, type: 'music', vol: 0.80,
             fadeIn: 1, fadeOut: 2, startAt: 0, notes: '',
             state: isFirst ? 'next' : 'pending',
-            filepath: file.name, // nom du fichier audio (clé de liaison avec le handle IDB)
+            filepath: relPath,
           });
         } else {
-          pads.push({ id, name, type: 'music', vol: 0.80, emoji: guessEmoji(file.name), filepath: file.name });
+          pads.push({ id, name, type: 'music', vol: 0.80, emoji: guessEmoji(file.name), filepath: relPath });
         }
       } catch(e) {
+        logger.error('[confirmImport] ' + name, e); _updateLogBadge();
         showToast('⚠ Erreur : ' + name);
       }
       done++;
@@ -2422,45 +2900,132 @@
   }
 
   // ════════════════════════════════════════════════
-  // CHARGEMENT DES SONS — handles par fichier
-  // Chaque cue/pad stocke son FileSystemFileHandle
-  // dans IndexedDB. Au démarrage, on redemande la
-  // permission fichier par fichier et on charge.
-  // Aucune copie des données audio.
+  // CHARGEMENT DES SONS
+  // Ordre de résolution :
+  //   1. audioHandles (en mémoire, cette session)
+  //   2. audioDirStore → requestPermission (1 clic)
+  //   3. Bandeau "Sélectionner le dossier"
+  // filepath = chemin relatif depuis la racine.
+  // _loadOnDemand : chargement à la volée au play.
   // ════════════════════════════════════════════════
 
+  // Charge un fichier à la demande depuis le dossier racine du bon type.
+  // kind = 'seq' (cue séquence) | 'pad' (son libre)
+  async function _loadOnDemand(id, filepath, kind) {
+    const known = audioHandles.get(String(id));
+    if (known) {
+      try { await engine.loadFile(id, await known.getFile()); return true; } catch(_) {}
+    }
+    const dirMap = await _buildDirFileMap(kind);
+    const fh = dirMap.get(filepath.normalize('NFC'));
+    if (!fh) return false;
+    try {
+      await engine.loadFile(id, await fh.getFile());
+      audioHandles.set(String(id), fh);
+      return true;
+    } catch(_) { return false; }
+  }
+
   function _buildAudioItems() {
+    // kind='seq' pour la séquence, kind='pad' pour les sons libres
     const items = [
-      ...cues.filter(c => c.type !== 'section' && c.filepath).map(c => ({ id: c.id, filepath: c.filepath, name: c.name })),
-      ...pads.filter(p => p.filepath).map(p => ({ id: p.id, filepath: p.filepath, name: p.name })),
+      ...cues.filter(c => c.type !== 'section' && c.filepath).map(c => ({ id: c.id, filepath: c.filepath, name: c.name, kind: 'seq' })),
+      ...pads.filter(p => p.filepath).map(p => ({ id: p.id, filepath: p.filepath, name: p.name, kind: 'pad' })),
     ];
-    // Déduplication par id (chaque cue/pad a son propre handle)
+    // Déduplication : un même id ne doit apparaître qu'une fois
+    // (side-effect dans filter : seen.add retourne true, donc l'élément passe)
     const seen = new Set();
     return items.filter(x => seen.has(x.id) ? false : (seen.add(x.id), true));
   }
 
+  // Charge le dossier racine depuis IDB selon le kind ('seq' ou 'pad'),
+  // demande la permission si nécessaire (1 clic Chrome),
+  // vérifie que le nom du dossier correspond au projet chargé,
+  // puis scanne récursivement → Map<relpath, FileHandle>.
+  async function _buildDirFileMap(kind) {
+    const storeKey    = kind === 'pad' ? 'rootPads' : 'rootSeq';
+    const expectedName = kind === 'pad' ? currentAudioRootPads : currentAudioRootSeq;
+    const root = await audioDirStore.get(storeKey);
+    if (!root) return new Map();
+    if (expectedName && root.name !== expectedName) return new Map();
+    let perm = await root.queryPermission({ mode: 'read' });
+    if (perm !== 'granted') perm = await root.requestPermission({ mode: 'read' });
+    if (perm !== 'granted') return new Map();
+    return _scanDir(root, '');
+  }
+
+  function _showMissingBanner(missing) {
+    const banner   = document.getElementById('loadBanner');
+    const names    = missing.map(m => m.name);
+    const preview  = names.slice(0, 3).join(', ') + (names.length > 3 ? ` +${names.length - 3}` : '');
+    const hasSeq   = missing.some(m => m.kind === 'seq');
+    const hasPads  = missing.some(m => m.kind === 'pad');
+    const btnStyle = 'background:var(--accent);color:var(--on-accent);border:none;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:6px;';
+    const btnSeq   = hasSeq  ? `<button onclick="loadMissingSounds('seq')"  style="${btnStyle}">📁 Musiques${currentAudioRootSeq  ? ` <em>("${currentAudioRootSeq}")</em>`  : ''}</button>` : '';
+    const btnPads  = hasPads ? `<button onclick="loadMissingSounds('pad')"  style="${btnStyle}">📁 Sons libres${currentAudioRootPads ? ` <em>("${currentAudioRootPads}")</em>` : ''}</button>` : '';
+    banner.innerHTML = `
+      <div class="load-dot" style="background:var(--red)"></div>
+      <span title="${names.join('\n')}">${names.length} son${names.length > 1 ? 's' : ''} manquant${names.length > 1 ? 's' : ''} : <em>${preview}</em></span>
+      ${btnSeq}${btnPads}
+      <button onclick="document.getElementById('loadBanner').classList.add('hidden')" style="
+        background:none;border:none;color:var(--text-muted);font-size:16px;
+        cursor:pointer;margin-left:auto;padding:0 4px;">✕</button>
+    `;
+  }
+
   async function preloadAllSounds() {
     const banner = document.getElementById('loadBanner');
-    const text   = document.getElementById('loadBannerText');
-    const items  = _buildAudioItems();
+    // Réinitialise le HTML du banner : _showMissingBanner peut avoir remplacé
+    // le contenu, ce qui supprime loadBannerText et casse le second appel.
+    banner.innerHTML = '<div class="load-dot"></div><span id="loadBannerText">Chargement des sons…</span>';
+    const text  = document.getElementById('loadBannerText');
+    const items = _buildAudioItems();
 
     if (!items.length) { banner.classList.add('hidden'); return; }
     banner.classList.remove('hidden');
     text.textContent = 'Chargement des sons…';
 
-    let loaded = 0, missing = [];
+    let loaded = 0;
+    let missing = [];
 
-    await Promise.allSettled(items.map(async item => {
+    // Essai 1 : handles déjà en mémoire (cette session)
+    for (const item of items) {
       const handle = audioHandles.get(String(item.id));
-      if (!handle) { missing.push(item); return; }
+      if (!handle) { missing.push(item); continue; }
       try {
         const file = await handle.getFile();
         await engine.loadFile(item.id, file);
         loaded++;
+        text.textContent = `Sons… ${loaded}/${items.length}`;
       } catch(_) { missing.push(item); }
-      text.textContent = `Sons… ${loaded}/${items.length}`;
-      renderCueList(); renderPads();
-    }));
+    }
+
+    // Essai 2 : dossiers persistés en IDB → requestPermission (1 clic)
+    // Séquence et sons libres peuvent avoir des dossiers racine distincts :
+    // on regroupe les manquants par kind pour ne faire qu'un scan par dossier.
+    if (missing.length && window.showDirectoryPicker) {
+      text.textContent = 'Restauration des dossiers audio…';
+      const byKind = { seq: missing.filter(i => i.kind === 'seq'), pad: missing.filter(i => i.kind === 'pad') };
+      const stillMissing = [];
+      for (const kind of ['seq', 'pad']) {
+        if (!byKind[kind].length) continue;
+        try {
+          const dirMap = await _buildDirFileMap(kind);
+          if (!dirMap.size) { stillMissing.push(...byKind[kind]); continue; }
+          for (const item of byKind[kind]) {
+            const fh = dirMap.get(item.filepath.normalize('NFC'));
+            if (!fh) { stillMissing.push(item); continue; }
+            try {
+              await engine.loadFile(item.id, await fh.getFile());
+              audioHandles.set(String(item.id), fh);
+              loaded++;
+              text.textContent = `Sons… ${loaded}/${items.length}`;
+            } catch(_) { stillMissing.push(item); }
+          }
+        } catch(_) { stillMissing.push(...byKind[kind]); }
+      }
+      missing = stillMissing;
+    }
 
     renderCueList(); renderPads();
 
@@ -2470,65 +3035,32 @@
       return;
     }
 
-    // Sons sans handle → proposer de sélectionner le dossier
     window._missingSounds = missing;
-    const names   = missing.map(m => m.name);
-    const preview = names.slice(0, 3).join(', ') + (names.length > 3 ? ` +${names.length - 3}` : '');
-    banner.innerHTML = `
-      <div class="load-dot" style="background:var(--red)"></div>
-      <span title="${names.join('\n')}">${names.length} son${names.length > 1 ? 's' : ''} manquant${names.length > 1 ? 's' : ''} : <em>${preview}</em></span>
-      <button onclick="loadMissingSounds()" style="
-        background:var(--accent);color:var(--on-accent);border:none;border-radius:4px;
-        padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:6px;">
-        📂 Sélectionner le dossier
-      </button>
-      <button onclick="document.getElementById('loadBanner').classList.add('hidden')" style="
-        background:none;border:none;color:var(--text-muted);font-size:16px;
-        cursor:pointer;margin-left:auto;padding:0 4px;">✕</button>
-    `;
+    missing.forEach(m => logger.warn('[preload] Son manquant : ' + m.filepath + ' (' + m.name + ')'));
+    _updateLogBadge();
+    _showMissingBanner(missing);
   }
 
-  // Sélectionne un dossier, charge les sons manquants et persiste les handles
-  async function loadMissingSounds() {
-    const missing = window._missingSounds ?? [];
-    if (!missing.length) return;
+  // Sélectionne le dossier racine pour 'seq' ou 'pad', persiste en IDB,
+  // puis relance le chargement complet. N'ouvre pas la dialog d'import.
+  async function loadMissingSounds(kind) {
+    if (!window.showDirectoryPicker) return;
+    const storeKey = kind === 'pad' ? 'rootPads' : 'rootSeq';
 
-    let fileHandles = new Map(); // filepath → FileSystemFileHandle
+    let rootHandle;
+    try {
+      rootHandle = await window.showDirectoryPicker({ mode: 'read' });
+    } catch(e) { return; }
 
-    if (window.showDirectoryPicker) {
-      try {
-        const dir = await window.showDirectoryPicker({ mode: 'read' });
-        for await (const entry of dir.values()) {
-          if (entry.kind === 'file' && /\.(mp3|wav|ogg|m4a|aac)$/i.test(entry.name))
-            fileHandles.set(entry.name, entry);
-        }
-      } catch(e) { if (e.name !== 'AbortError') document.getElementById('folderFileInput').click(); return; }
-    } else {
-      document.getElementById('folderFileInput').click(); return;
-    }
+    await audioDirStore.set(storeKey, rootHandle);
+    if (kind === 'pad') currentAudioRootPads = rootHandle.name;
+    else                currentAudioRootSeq  = rootHandle.name;
 
-    const banner = document.getElementById('loadBanner');
-    let loaded = 0, stillMissing = [];
-
-    for (const item of missing) {
-      const handle = fileHandles.get(item.filepath);
-      if (!handle) { stillMissing.push(item); continue; }
-      try {
-        const file = await handle.getFile();
-        await engine.loadFile(item.id, file);
-        audioHandles.set(String(item.id), handle);
-        loaded++;
-      } catch(_) { stillMissing.push(item); }
-    }
-
-    window._missingSounds = stillMissing;
-    banner.innerHTML = stillMissing.length === 0
-      ? `<div class="load-dot"></div><span>✓ Tous les sons chargés</span>`
-      : `<div class="load-dot" style="background:var(--red)"></div><span>${stillMissing.length} son(s) toujours manquant(s)</span>`;
-
-    if (!stillMissing.length) setTimeout(() => banner.classList.add('hidden'), 2000);
-    renderCueList(); renderPads();
-    showToast(`✓ ${loaded} son${loaded > 1 ? 's' : ''} chargé${loaded > 1 ? 's' : ''}`);
+    engine.clearBuffers();
+    audioHandles.clear();
+    window._missingSounds = null;
+    await preloadAllSounds();
+    autoSave(); // persiste audioRootSeq/audioRootPads dans le JSON
   }
 
   // ════════════════════════════════════════════════
@@ -2536,12 +3068,21 @@
   // ════════════════════════════════════════════════
 
   // Construit le payload JSON du projet en cours
+  let currentAudioRootSeq  = null; // dossier racine des cues séquence
+  let currentAudioRootPads = null; // dossier racine des sons libres
+
   function _buildProjectPayload() {
     return {
-      version: '1.0',
+      version: '1.1',
       name: currentProjectName ?? 'Sans titre',
       savedAt: new Date().toISOString(),
-      cues: cues.map(c => ({ ...c, state: c.state === 'playing' ? 'pending' : c.state })),
+      audioRootSeq:  currentAudioRootSeq  ?? undefined,
+      audioRootPads: currentAudioRootPads ?? undefined,
+      // _prevState est un champ interne de runtime (sauvegarde avant pause/stop) — ne doit pas polluer le JSON
+      cues: cues.map(c => {
+        const { _prevState, ...rest } = c;
+        return { ...rest, state: c.state === 'playing' ? 'pending' : c.state };
+      }),
       pads: pads.map(p => ({ ...p })),
     };
   }
@@ -2566,14 +3107,19 @@
     cues.length = 0;
     (data.cues ?? []).forEach(c => {
       if (c.dbKey && !c.filepath) { c.filepath = c.dbKey; delete c.dbKey; }
+      if (c.url   && !c.filepath) { c.filepath = c.url;   delete c.url;   }
       cues.push(c);
     });
     pads.length = 0;
     (data.pads ?? []).forEach(p => {
       if (p.dbKey && !p.filepath) { p.filepath = p.dbKey; delete p.dbKey; }
+      if (p.url   && !p.filepath) { p.filepath = p.url;   delete p.url;   }
       pads.push(p);
     });
-    currentProjectName = data.name ?? null;
+    currentProjectName   = data.name ?? null;
+    // Migration : ancien format audioRoot unique → appliqué aux deux types
+    currentAudioRootSeq  = data.audioRootSeq  ?? data.audioRoot ?? null;
+    currentAudioRootPads = data.audioRootPads ?? data.audioRoot ?? null;
     document.querySelector('.project-name').textContent = currentProjectName ?? '—';
   }
 
@@ -2593,6 +3139,7 @@
       showToast('📂 ' + result.name + ' — vérification des fichiers…');
       await preloadAllSounds();
     } catch(e) {
+      logger.error('[openProjectFile]', e); _updateLogBadge();
       showToast('⚠ Erreur ouverture : ' + e.message);
     }
   }
@@ -2607,6 +3154,7 @@
       _cacheProject();
       showToast('💾 Enregistré : ' + name + '.json');
     } catch(e) {
+      logger.error('[saveProjectFile]', e); _updateLogBadge();
       showToast('⚠ Erreur enregistrement : ' + e.message);
     }
   }
@@ -2693,6 +3241,87 @@
       const saved = localStorage.getItem('impromusic-theme');
       if (saved) applyFullTheme(JSON.parse(saved));
     } catch(_) {}
+  }
+
+  // ════════════════════════════════════════════════
+  // DIVISEUR GLISSABLE — resize séquence / notes
+  // ════════════════════════════════════════════════
+  (() => {
+    const SEQ_PCT_KEY = 'impromusic-seq-pct';
+    const MIN_PCT = 25, MAX_PCT = 80;
+
+    function applyPct(pct) {
+      document.getElementById('seqBody').style.setProperty('--seq-pct', pct + '%');
+      // Aligne l'en-tête Notes sur la même largeur
+      const notesHdr = document.querySelector('.notes-col-header');
+      if (notesHdr) notesHdr.style.width = (100 - pct) + '%';
+      const seqHdr = document.querySelector('.col-header');
+      if (seqHdr) seqHdr.style.width = pct + '%';
+    }
+
+    // Restaure la préférence sauvegardée
+    const saved = parseFloat(localStorage.getItem(SEQ_PCT_KEY));
+    applyPct(isNaN(saved) ? 58 : saved);
+
+    const handle = document.getElementById('seqDivider');
+    let dragging = false, startX = 0, startPct = 58;
+
+    handle.addEventListener('pointerdown', e => {
+      dragging = true;
+      startX = e.clientX;
+      startPct = parseFloat(getComputedStyle(document.getElementById('seqBody')).getPropertyValue('--seq-pct')) || 58;
+      handle.classList.add('dragging');
+      handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    handle.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const body  = document.getElementById('seqBody');
+      const totalW = body.getBoundingClientRect().width;
+      const delta  = e.clientX - startX;
+      const newPct = Math.min(MAX_PCT, Math.max(MIN_PCT, startPct + delta / totalW * 100));
+      applyPct(newPct);
+    });
+
+    handle.addEventListener('pointerup', e => {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      const pct = parseFloat(getComputedStyle(document.getElementById('seqBody')).getPropertyValue('--seq-pct')) || 58;
+      localStorage.setItem(SEQ_PCT_KEY, pct);
+    });
+  })();
+
+  const LOG_COLORS = { ERROR: '#e74c3c', WARN: '#e8a020', INFO: '#aaa' };
+
+  function renderLogPanel() {
+    const entries = logger.all();
+    const el = document.getElementById('logEntries');
+    if (!entries.length) { el.innerHTML = '<span style="color:var(--text-muted)">Aucune entrée.</span>'; return; }
+    // Afficher du plus récent au plus ancien
+    el.innerHTML = [...entries].reverse().map(e => {
+      const color = LOG_COLORS[e.level] ?? '#aaa';
+      const time  = e.ts.replace('T', ' ').replace(/\.\d+Z$/, '');
+      return `<div style="margin-bottom:4px"><span style="color:var(--text-muted)">${time}</span> <span style="color:${color};font-weight:700">[${e.level}]</span> ${e.msg}</div>`;
+    }).join('');
+  }
+
+  function openLogPanel() {
+    renderLogPanel();
+    document.getElementById('logPanel').classList.add('open');
+    document.getElementById('logOverlay').classList.add('open');
+  }
+
+  function closeLogPanel() {
+    document.getElementById('logPanel').classList.remove('open');
+    document.getElementById('logOverlay').classList.remove('open');
+  }
+
+  // Met à jour le badge 🪲 si des erreurs sont présentes
+  function _updateLogBadge() {
+    const hasErrors = logger.all().some(e => e.level === 'ERROR');
+    document.getElementById('btnLog').style.outline = hasErrors ? '2px solid var(--red)' : '';
   }
 
   function openThemePanel() {
@@ -2799,7 +3428,7 @@
     document.getElementById('btnMigrate').addEventListener('click', () => {
       projects.forEach(p => {
         const payload = {
-          version: '1.0',
+          version: '1.1',
           name: p.name,
           savedAt: p.savedAt,
           cues: (p.cues ?? []).map(c => ({ ...c, state: c.state === 'playing' ? 'pending' : c.state })),
