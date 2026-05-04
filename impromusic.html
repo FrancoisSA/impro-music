@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>ImproMusic — Régie Son</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Inter:wght@400;600;700&family=Nunito:wght@400;600;700&family=Roboto:wght@400;500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0f0f0f;
@@ -52,7 +55,7 @@
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, 'Segoe UI', sans-serif;
+    font-family: var(--font-ui, 'Inter', -apple-system, 'Segoe UI', sans-serif);
     font-size: 15px;
     height: 100dvh;
     display: flex;
@@ -194,15 +197,30 @@
     display: flex;
     overflow: hidden;
     gap: 0;
+    position: relative; /* requis pour positionner .cols-divider en absolu */
   }
 
   /* ── COLONNE SÉQUENCE + NOTES ── */
   .col-seq {
     display: flex;
     flex-direction: column;
-    flex: 1;          /* largeur variable */
+    /* La largeur est pilotée par --cols-pct via JS (défaut 65%) */
+    flex: 0 0 var(--cols-pct, 65%);
     overflow: hidden;
   }
+
+  /* Diviseur glissable entre col-seq et col-playlists */
+  .cols-divider {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: calc(var(--cols-pct, 65%) - 3px);
+    width: 6px;
+    cursor: col-resize;
+    z-index: 20;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .cols-divider:hover, .cols-divider.dragging { background: var(--accent-glow); }
 
   /* Wrapper qui contient le scroll unique et le diviseur */
   .seq-body {
@@ -397,7 +415,7 @@
     transition: background 0.1s;
   }
   .section-sep:hover { background: var(--surface2); }
-  .section-chevron { font-size: 11px; color: var(--accent); flex-shrink: 0; transition: transform 0.2s; }
+  .section-chevron { font-size: 20px; color: var(--accent); flex-shrink: 0; transition: transform 0.2s; }
   .section-sep.collapsed .section-chevron { transform: rotate(-90deg); }
   .section-title {
     font-size: 11px; font-weight: 800; text-transform: uppercase;
@@ -445,6 +463,8 @@
   .ct-btn.ct-pause { color: var(--accent); }
   .ct-btn.ct-stop  { color: var(--red); }
   .ct-btn.ct-next  { color: var(--text-dim); }
+  /* Bouton stop toujours visible mais grisé quand inactif */
+  .ct-btn.ct-stop:disabled { color: var(--text-dim); opacity: 0.3; cursor: default; }
 
   /* Confirmation inline suppression */
   .delete-confirm {
@@ -587,6 +607,194 @@
     transition: all 0.15s;
   }
   .pad-add:active { background: var(--surface); }
+
+  /* ── COLONNE PLAYLISTS LIBRES ── */
+  .col-playlists {
+    display: flex;
+    flex-direction: column;
+    flex: 1; /* prend l'espace restant après col-seq */
+    overflow: hidden;
+    border-left: 1px solid var(--border);
+    min-width: 0; /* évite que flexbox bloque le redimensionnement */
+  }
+  .pl-col-header {
+    padding: 7px 12px 5px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .btn-pl-collapse-all {
+    background: none; border: none; cursor: pointer;
+    font-size: 20px; color: var(--accent);
+    padding: 0 2px; line-height: 1;
+    transition: transform 0.15s, color 0.1s;
+    flex-shrink: 0;
+  }
+  .btn-pl-collapse-all:hover { color: var(--text); }
+  .btn-pl-collapse-all.all-collapsed { transform: rotate(-90deg); }
+  .pl-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pl-scroll::-webkit-scrollbar { width: 3px; }
+  .pl-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .pl-group { margin-bottom: 10px; }
+  .pl-group-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 4px 4px 2px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 5px;
+  }
+  .pl-group-name {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pl-ea-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 12px; color: var(--text-muted);
+    padding: 2px 5px; border-radius: 4px;
+  }
+  .pl-ea-btn:hover { background: var(--surface2); color: var(--text); }
+  .pl-ea-btn.del:hover { color: var(--red); }
+  /* Chevron de repli — toujours visible */
+  .pl-toggle {
+    background: none; border: none; cursor: pointer;
+    font-size: 20px; color: var(--accent);
+    padding: 0 4px; border-radius: 4px;
+    transition: transform 0.15s, color 0.1s;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .pl-toggle:hover { color: var(--text); }
+  .pl-toggle.collapsed { transform: rotate(-90deg); }
+  .pl-grid.hidden { display: none; }
+
+  /* Grille 2 colonnes pour les morceaux */
+  .pl-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+  }
+  .pl-track {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 5px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    cursor: pointer;
+    transition: border-color 0.12s;
+    position: relative;
+    min-height: 52px;
+  }
+  .pl-track:hover { border-color: var(--border-hover, #444); }
+  .pl-track.active { border-color: var(--accent); background: var(--bg-active, var(--surface2)); }
+  .pl-track.paused { border-color: #5b8dd9; }
+  .pl-track-name {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+    color: var(--text);
+  }
+  .pl-track-meta {
+    font-size: 9px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .pl-track-transport {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    margin-top: auto;
+  }
+  .pl-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 5px;
+    color: var(--text-dim);
+    line-height: 1;
+    transition: all 0.1s;
+  }
+  .pl-btn:hover  { border-color: var(--border); color: var(--text); }
+  .pl-btn:active { background: var(--surface2); }
+  .pl-btn.play  { color: var(--green-dark); }
+  .pl-btn.stop  { color: var(--red); }
+  .pl-btn.loop.on { color: var(--accent); }
+  .pl-btn:disabled { opacity: 0.25; cursor: default; }
+  .pl-add-playlist {
+    width: 100%;
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 7px 0;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  .pl-add-playlist:hover { background: var(--surface); color: var(--text); }
+  /* Layout carte avec art : row avec carré à gauche */
+  .pl-track.has-art {
+    flex-direction: row;
+    align-items: stretch;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+  .pl-track-art {
+    width: 52px;
+    min-width: 52px;
+    height: 100%;
+    min-height: 52px;
+    object-fit: cover;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    display: block;
+    flex-shrink: 0;
+  }
+  .pl-track-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 5px 6px;
+  }
+  .pl-track-edit-overlay {
+    position: absolute;
+    top: 2px; right: 2px;
+    display: flex; gap: 2px;
+  }
+  .pl-track-edit-btn {
+    background: var(--surface2); border: none; border-radius: 3px;
+    font-size: 9px; padding: 1px 4px; cursor: pointer; color: var(--text-muted);
+  }
+  .pl-track-edit-btn:hover { background: var(--border); color: var(--text); }
+  .pl-track-edit-btn.del:hover { background: var(--red-bg); color: var(--on-red); }
 
   /* Bouton dossier */
   .btn-folder {
@@ -803,6 +1011,17 @@
     padding: 5px 0;
   }
   .theme-row-label { flex: 1; font-size: 13px; color: var(--text-dim); }
+  .font-picker { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 8px; }
+  .font-btn {
+    flex: 1; min-width: 80px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text-dim);
+    font-size: 14px; padding: 7px 6px;
+    cursor: pointer; text-align: center;
+    transition: border-color 0.1s, color 0.1s;
+  }
+  .font-btn:hover { border-color: var(--text-muted); color: var(--text); }
+  .font-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
   .theme-swatch {
     width: 28px; height: 28px; border-radius: 5px;
     border: 1px solid var(--border); cursor: pointer; flex-shrink: 0;
@@ -907,7 +1126,23 @@
     </div>
   </div>
 
-  <!-- COLONNE DROITE : pads libres -->
+  <!-- Diviseur glissable entre col-seq et col-playlists -->
+  <div class="cols-divider" id="colsDivider"></div>
+
+  <!-- COLONNE PLAYLISTS LIBRES -->
+  <div class="col-playlists" id="colPlaylists">
+    <div class="pl-col-header">
+      <button class="btn-pl-collapse-all" id="btnPlCollapseAll" onclick="toggleCollapseAllPlaylists()" title="Tout replier / déplier">▾</button>
+      <span class="col-title">Playlists</span>
+      <span class="col-badge" id="plCount">0</span>
+      <button class="btn-edit-mode" id="btnPlEditMode" onclick="togglePlEditMode()">✏ Éditer</button>
+    </div>
+    <div class="pl-scroll" id="plScroll">
+      <div id="plList"></div>
+    </div>
+  </div>
+
+  <!-- COLONNE DROITE : pads libres (masquée) -->
   <div class="col-pads" style="display:none">
     <div class="pads-col-header">
       <span class="col-title">Sons libres</span>
@@ -1095,6 +1330,15 @@
     <div class="theme-row" data-var="--green-dark" data-label="Play (cartes)"></div>
     <div class="theme-row" data-var="--red"        data-label="Stop / Supprimer"></div>
     <div class="theme-row" data-var="--red-dark"   data-label="Confirmation suppression"></div>
+    <!-- Groupe Police -->
+    <div class="theme-group-label">Police d'affichage</div>
+    <div class="font-picker" id="fontPicker">
+      <button class="font-btn" data-font="Inter"        style="font-family:'Inter'">Inter</button>
+      <button class="font-btn" data-font="DM Sans"      style="font-family:'DM Sans'">DM Sans</button>
+      <button class="font-btn" data-font="Nunito"       style="font-family:'Nunito'">Nunito</button>
+      <button class="font-btn" data-font="Roboto"       style="font-family:'Roboto'">Roboto</button>
+      <button class="font-btn" data-font="Source Sans 3" style="font-family:'Source Sans 3'">Source Sans</button>
+    </div>
     <!-- Groupe Types de sons -->
     <div class="theme-group-label">Types de sons</div>
     <div class="theme-row" data-var="--color-music"    data-label="Musique"></div>
@@ -1489,14 +1733,139 @@
     function clearBuffers() { buffers.clear(); }
     function clearBuffer(id) { buffers.delete(String(id)); }
 
+    function getCtx()        { return _ensureCtx(); }
+    function getMasterGain() { _ensureCtx(); return masterGain; }
+
     return {
       loadFile, loadBuffer, hasBuffer, getDuration, _copyBuffer: copyBuffer,
       play, stop, pause, resume,
       getElapsed, setMasterVolume,
       isPlaying, isPaused, currentId,
-      ensureCtx: _ensureCtx,
+      ensureCtx: _ensureCtx, getCtx, getMasterGain,
       clearBuffers, clearBuffer,
     };
+  })();
+
+  // ════════════════════════════════════════════════
+  // MEDIA PLAYER — playlists libres
+  // Utilise <audio> + createMediaElementSource au lieu
+  // d'AudioBuffer : aucune RAM pour le décodage PCM,
+  // le navigateur streame depuis le disque.
+  // Branché sur masterGain pour hériter du volume global.
+  // ════════════════════════════════════════════════
+  const mediaPlayer = (() => {
+    let _el        = null;  // <audio> element courant
+    let _url       = null;  // objectURL à révoquer après usage
+    let _gain      = null;  // GainNode volume + fades
+    let _fadeTimer = null;
+
+    function _cleanup() {
+      clearTimeout(_fadeTimer); _fadeTimer = null;
+      if (_el) { _el.pause(); _el.src = ''; _el.onended = null; _el = null; }
+      if (_url) { URL.revokeObjectURL(_url); _url = null; }
+      // Déconnecter le gain évite les fuites de nœuds dans l'AudioContext
+      try { _gain?.disconnect(); } catch(_) {}
+      _gain = null;
+    }
+
+    // file : objet File (depuis FileSystemFileHandle.getFile())
+    // opts : { vol, fadeIn, fadeOut, startAt, endAt, loop }
+    async function play(file, opts = {}, onEnded) {
+      _cleanup();
+      const ctx  = engine.getCtx();
+      const master = engine.getMasterGain();
+      const { vol = 0.8, fadeIn = 0, fadeOut = 1, startAt = 0, endAt = 0, loop = false } = opts;
+
+      _url = URL.createObjectURL(file);
+      _el = new Audio();
+      _el.loop = loop;
+
+      _gain = ctx.createGain();
+      _gain.connect(master);
+
+      // createMediaElementSource ne peut être appelé qu'une fois par élément
+      const src = ctx.createMediaElementSource(_el);
+      src.connect(_gain);
+
+      // Fade in : part de quasi-silence pour éviter le clic
+      _gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      if (fadeIn > 0) {
+        _gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + fadeIn);
+      } else {
+        _gain.gain.setValueAtTime(vol, ctx.currentTime);
+      }
+
+      _el.src  = _url;
+      _el.currentTime = startAt;
+
+      _el.onended = () => {
+        _cleanup();
+        if (onEnded) onEnded();
+      };
+
+      // Fade out automatique (hors boucle) et arrêt dur à endAt : déclenché via timeupdate
+      if (!loop && (fadeOut > 0 || endAt > 0)) {
+        _el.addEventListener('timeupdate', function _watchFade() {
+          if (!_el) return;
+          const pos = _el.currentTime;
+          // Arrêt dur à endAt si défini (endAt > 0 = position absolue)
+          if (endAt > 0 && pos >= endAt) {
+            _el.removeEventListener('timeupdate', _watchFade);
+            _cleanup();
+            if (onEnded) onEnded();
+            return;
+          }
+          if (fadeOut > 0) {
+            const stopAt  = endAt > 0 ? endAt : _el.duration;
+            const remaining = stopAt - pos;
+            if (!isNaN(remaining) && remaining <= fadeOut) {
+              _el.removeEventListener('timeupdate', _watchFade);
+              const ctx2 = engine.getCtx();
+              if (_gain) {
+                _gain.gain.cancelScheduledValues(ctx2.currentTime);
+                _gain.gain.setValueAtTime(_gain.gain.value, ctx2.currentTime);
+                _gain.gain.linearRampToValueAtTime(0.0001, ctx2.currentTime + remaining);
+              }
+            }
+          }
+        });
+      }
+
+      try {
+        await _el.play();
+      } catch(e) {
+        // AbortError peut survenir si stop() est appelé avant la fin du chargement
+        if (e.name !== 'AbortError') throw e;
+      }
+    }
+
+    function stop(fadeOut = 0) {
+      if (!_el) return;
+      if (fadeOut > 0 && _gain) {
+        const ctx = engine.getCtx();
+        _gain.gain.cancelScheduledValues(ctx.currentTime);
+        _gain.gain.setValueAtTime(_gain.gain.value, ctx.currentTime);
+        _gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + fadeOut);
+        _fadeTimer = setTimeout(_cleanup, (fadeOut + 0.1) * 1000);
+        // Détache l'onended pour ne pas déclencher le callback de fin naturelle
+        if (_el) _el.onended = null;
+      } else {
+        _cleanup();
+      }
+    }
+
+    function pause()  { _el?.pause(); }
+    function resume() { _el?.play().catch(() => {}); }
+
+    function isActive()  { return _el !== null; }
+    function isPlaying() { return _el ? !_el.paused : false; }
+    function isPaused()  { return _el !== null && _el.paused; }
+
+    // Durée totale en secondes (disponible après metadata chargé)
+    function getDuration()    { const d = _el?.duration; return (d && isFinite(d)) ? d : null; }
+    function getCurrentTime() { return _el?.currentTime ?? null; }
+
+    return { play, stop, pause, resume, isActive, isPlaying, isPaused, getDuration, getCurrentTime };
   })();
 
   // ════════════════════════════════════════════════
@@ -1511,10 +1880,18 @@
   let modalTarget  = 'seq';
   let currentCue   = null;
   let currentPad   = null;
+  let currentTrack = null; // { track, playlistId } — morceau de playlist en cours
+  let playlists    = [];   // [{ id, name, audioRoot, tracks: [...] }]
+  const playlistDirHandles = new Map(); // playlistId → FileSystemDirectoryHandle
+  let plEditMode   = false;
+  const plCollapsed = new Set(); // IDs des playlists repliées (état session)
   let editMode     = false;
   let sourdineLevel  = 0;    // 0=off, 1=−25%, 2=−50%, 3=−75%
   let silenceActive  = false;
-  let editingCueId = null;   // null = création, sinon id du cue à modifier
+  let editingCueId = null;           // null = création, sinon id du cue à modifier
+  let editingTrackId = null;         // id du track de playlist en édition
+  let editingTrackPlaylistId = null; // id de la playlist parente
+  const trackArt = new Map();        // trackId → objectURL | null (null = traité, pas d'image)
   let confirmDeleteId = null; // id du cue en attente de confirmation de suppression
   let currentProjectName = null; // nom du fichier projet ouvert (sans extension)
 
@@ -1574,7 +1951,7 @@
 
     const nextCue = _nextCueInSeq();
     if (nextCue) {
-      next.innerHTML = `<span class="np-next-label">SUIVANT</span><span class="np-next-name">${nextCue.name}</span>`;
+      next.innerHTML = `<span class="np-next-label">SUIVANT</span><span class="np-next-name">${escapeHtml(nextCue.name)}</span>`;
     } else {
       next.innerHTML = '<span class="np-next-label">FIN DE SÉQUENCE</span>';
     }
@@ -1631,20 +2008,32 @@
   }
 
   function handleFadeOut() {
-    if (!engine.isPlaying() && !engine.isPaused()) return;
+    const isEngineActive = engine.isPlaying() || engine.isPaused();
+    const isMediaActive  = mediaPlayer.isActive();
+    if (!isEngineActive && !isMediaActive) return;
     const FADE = 2;
-    engine.stop(FADE);
-    stopProgressLoop();
-    showToast('↘ Fade out ' + FADE + 's');
-    // Met à jour l'UI après la fin du fade
-    setTimeout(() => {
-      if (currentCue) { currentCue.state = 'played'; delete currentCue._prevState; }
-      currentCue = null;
-      currentPad = null;
-      updateNpBar('idle');
-      renderCueList();
-      renderPads();
-    }, (FADE + 0.15) * 1000);
+    if (isMediaActive) {
+      mediaPlayer.stop(FADE);
+      stopProgressLoop();
+      showToast('↘ Fade out ' + FADE + 's');
+      setTimeout(() => {
+        currentTrack = null;
+        updateNpBar('idle');
+        renderPlaylists();
+      }, (FADE + 0.15) * 1000);
+    } else {
+      engine.stop(FADE);
+      stopProgressLoop();
+      showToast('↘ Fade out ' + FADE + 's');
+      setTimeout(() => {
+        if (currentCue) { currentCue.state = 'played'; delete currentCue._prevState; }
+        currentCue = null;
+        currentPad = null;
+        updateNpBar('idle');
+        renderCueList();
+        renderPads();
+      }, (FADE + 0.15) * 1000);
+    }
   }
 
   function updateNpBar(state, name, cue) {
@@ -1685,6 +2074,13 @@
   }
 
   function handleNpPlay() {
+    if (currentTrack && mediaPlayer.isPaused()) {
+      mediaPlayer.resume();
+      startProgressLoop();
+      updateNpBar('playing');
+      renderPlaylists();
+      return;
+    }
     if (!currentCue) return;
     if (engine.isPaused()) {
       engine.resume(currentCue.id, {
@@ -1705,14 +2101,26 @@
   function startProgressLoop() {
     if (rafId) return;
     function tick() {
-      const elapsed = engine.getElapsed();
-      if (elapsed !== null && currentCue) {
-        const dur = engine.getDuration(currentCue.id);
-        if (dur) {
+      // Source playlist : lit la position depuis l'élément <audio>
+      if (currentTrack && mediaPlayer.isActive()) {
+        const elapsed = mediaPlayer.getCurrentTime();
+        const dur     = mediaPlayer.getDuration();
+        if (elapsed !== null && dur) {
           const pct = Math.min(elapsed / dur * 100, 100);
           document.getElementById('progressFill').style.width = pct.toFixed(2) + '%';
-          document.getElementById('npTime').textContent =
-            secToMmss(elapsed) + ' / ' + secToMmss(dur);
+          document.getElementById('npTime').textContent = secToMmss(elapsed) + ' / ' + secToMmss(dur);
+        }
+      } else {
+        // Source séquence : lit la position depuis l'AudioBuffer
+        const elapsed = engine.getElapsed();
+        const activeId = currentCue?.id ?? null;
+        if (elapsed !== null && activeId) {
+          const dur = engine.getDuration(activeId);
+          if (dur) {
+            const pct = Math.min(elapsed / dur * 100, 100);
+            document.getElementById('progressFill').style.width = pct.toFixed(2) + '%';
+            document.getElementById('npTime').textContent = secToMmss(elapsed) + ' / ' + secToMmss(dur);
+          }
         }
       }
       rafId = requestAnimationFrame(tick);
@@ -1732,10 +2140,12 @@
 
   // Réinitialise l'UI "now playing" et arrête l'audio (avec fade si cue actif)
   function stopAll() {
-    const fadeOut = currentCue ? currentCue.fadeOut : 0;
+    const fadeOut = currentCue ? currentCue.fadeOut : (currentTrack ? currentTrack.track.fadeOut : 0);
     engine.stop(fadeOut);
-    currentCue = null;
-    currentPad = null;
+    mediaPlayer.stop(fadeOut);
+    currentCue   = null;
+    currentPad   = null;
+    currentTrack = null;
     stopProgressLoop();
     updateNpBar('idle');
   }
@@ -1812,7 +2222,24 @@
   }
 
   function handlePause() {
-    if (!currentCue && !currentPad) return;
+    if (!currentCue && !currentPad && !currentTrack) return;
+
+    if (currentTrack) {
+      // Pause / reprise pour les pistes playlist (mediaPlayer)
+      if (mediaPlayer.isPaused()) {
+        mediaPlayer.resume();
+        startProgressLoop();
+        updateNpBar('playing');
+        showToast('▶ Reprise');
+      } else {
+        mediaPlayer.pause();
+        stopProgressLoop();
+        updateNpBar('paused');
+        showToast('⏸ Pause');
+      }
+      renderPlaylists();
+      return;
+    }
 
     if (engine.isPaused()) {
       const item = currentCue || currentPad;
@@ -2258,11 +2685,12 @@
         if (isPaused) item.classList.add('paused');
         const loopOn = !!cue.loop;
 
+        const isThisCueActive = isPlaying || isPaused;
         const playBtn  = isPlaying ? '' : `<button class="ct-btn ct-play" title="Lecture">▶</button>`;
-        const pauseBtn = (isPlaying || isPaused)
+        const pauseBtn = isThisCueActive
           ? `<button class="ct-btn ct-pause" title="${isPaused ? 'Reprendre' : 'Pause'}">${isPaused ? '▶' : '⏸'}</button>` : '';
-        const stopBtn  = (isPlaying || isPaused)
-          ? `<button class="ct-btn ct-stop" title="Stop">■</button>` : '';
+        // Stop toujours visible — désactivé si ce cue n'est pas en cours
+        const stopBtn  = `<button class="ct-btn ct-stop" title="Stop"${isThisCueActive ? '' : ' disabled'}>■</button>`;
         const nextBtn  = `<button class="ct-btn ct-next" title="Marquer comme suivant">»</button>`;
 
         item.innerHTML = `
@@ -2290,9 +2718,12 @@
           e.stopPropagation(); if (isPaused) playDirectCue(cue); else handlePause();
         });
         item.querySelector('.ct-stop')?.addEventListener('click',  e => {
-          e.stopPropagation(); stopAll();
+          e.stopPropagation();
+          // Ne stoppe que si CE cue est actif — évite d'interrompre un autre cue
+          if (currentCue?.id !== cue.id) return;
+          stopAll();
           cue.state = 'pending'; delete cue._prevState;
-          currentCue = null; renderCueList(); renderPads();
+          renderCueList(); renderPlaylists();
         });
       }
 
@@ -2372,6 +2803,479 @@
   }
 
   // ════════════════════════════════════════════════
+  // PLAYLISTS LIBRES
+  // Chaque playlist = un dossier audio scanné à l'ajout.
+  // Les morceaux sont affichés en grille 2 colonnes.
+  // Un morceau se joue via le moteur unique (remplace
+  // tout son en cours, séquence ou autre playlist).
+  // ════════════════════════════════════════════════
+
+  function toggleCollapseAllPlaylists() {
+    const allCollapsed = playlists.every(pl => plCollapsed.has(pl.id));
+    if (allCollapsed) {
+      playlists.forEach(pl => plCollapsed.delete(pl.id));
+    } else {
+      playlists.forEach(pl => plCollapsed.add(pl.id));
+    }
+    document.getElementById('btnPlCollapseAll').classList.toggle('all-collapsed', !allCollapsed);
+    renderPlaylists();
+  }
+
+  function togglePlEditMode() {
+    plEditMode = !plEditMode;
+    const btn = document.getElementById('btnPlEditMode');
+    btn.textContent = plEditMode ? '✓ Terminer' : '✏ Éditer';
+    btn.style.background = plEditMode ? 'var(--accent)' : '';
+    btn.style.color       = plEditMode ? 'var(--on-accent)' : '';
+    renderPlaylists();
+  }
+
+  async function addPlaylist() {
+    if (!window.showDirectoryPicker) {
+      showToast('⚠ Sélection de dossier non supportée sur cet appareil');
+      return;
+    }
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+    } catch(e) {
+      if (e.name !== 'AbortError') showToast('⚠ ' + e.message);
+      return;
+    }
+
+    showToast('⏳ Scan du dossier…');
+    const fileMap = await _scanDir(dirHandle, '');
+    if (!fileMap.size) { showToast('Aucun fichier audio trouvé dans ce dossier'); return; }
+
+    const id = 'pl' + Date.now();
+    const tracks = [];
+    for (const [relPath, fh] of fileMap) {
+      const trackId = id + '_' + tracks.length;
+      tracks.push({
+        id: trackId,
+        name: cleanFileName(relPath.split('/').pop()),
+        filepath: relPath,
+        vol: 0.8, fadeIn: 0, fadeOut: 1,
+        startAt: 0, endAt: 0, loop: false,
+      });
+    }
+    // Tri alphabétique par chemin (ordre naturel du dossier) — Map.values() n'est pas trié
+    tracks.sort((a, b) => a.filepath.localeCompare(b.filepath));
+    // Ré-assigne les IDs après tri : les IDs provisoires du loop ci-dessus étaient positionnels
+    tracks.forEach((t, i) => { t.id = id + '_' + i; });
+
+    const pl = { id, name: dirHandle.name, audioRoot: dirHandle.name, tracks };
+    playlists.push(pl);
+    // Persiste le handle en IDB (clé 'rootPl-<id>') — rechargé à la prochaine session
+    await audioDirStore.set('rootPl-' + id, dirHandle);
+    playlistDirHandles.set(id, dirHandle);
+
+    // Prime le cache de handles et lance l'extraction d'album art en arrière-plan
+    for (const [relPath, fh] of fileMap) {
+      const t = tracks.find(tr => tr.filepath === relPath);
+      if (!t) continue;
+      audioHandles.set(t.id, fh); // évite un re-scan au premier Play
+      fh.getFile().then(f => _extractTrackArt(t.id, f)).catch(() => {});
+    }
+
+
+    autoSave();
+    renderPlaylists();
+    showToast(`✓ Playlist "${pl.name}" — ${tracks.length} morceaux`);
+  }
+
+  async function rescanPlaylist(plId) {
+    const pl = playlists.find(p => p.id === plId);
+    if (!pl) return;
+
+    // Récupère le handle du dossier (mémoire ou IDB)
+    let dirHandle = playlistDirHandles.get(plId) ?? await audioDirStore.get('rootPl-' + plId);
+    if (!dirHandle) {
+      showToast('⚠ Dossier introuvable — réimporte la playlist');
+      return;
+    }
+    let perm = await dirHandle.queryPermission({ mode: 'read' });
+    if (perm !== 'granted') perm = await dirHandle.requestPermission({ mode: 'read' });
+    if (perm !== 'granted') { showToast('⚠ Permission refusée'); return; }
+    playlistDirHandles.set(plId, dirHandle);
+
+    showToast('⏳ Rescan…');
+    const fileMap = await _scanDir(dirHandle, '');
+
+    // Index des tracks existants par filepath pour conserver leurs réglages
+    const existing = new Map(pl.tracks.map(t => [t.filepath, t]));
+    const newTracks = [];
+    let added = 0, removed = 0;
+
+    for (const [relPath, fh] of fileMap) {
+      if (existing.has(relPath)) {
+        newTracks.push(existing.get(relPath)); // conserve les réglages
+      } else {
+        const trackId = plId + '_' + Date.now() + '_' + newTracks.length;
+        newTracks.push({
+          id: trackId, name: cleanFileName(relPath.split('/').pop()),
+          filepath: relPath, vol: 0.8, fadeIn: 0, fadeOut: 1, startAt: 0, endAt: 0, loop: false,
+        });
+        added++;
+      }
+      // Prime le cache handle pour éviter un re-scan au premier Play
+      const t = newTracks[newTracks.length - 1];
+      audioHandles.set(t.id, fh);
+      fh.getFile().then(f => _extractTrackArt(t.id, f)).catch(() => {});
+    }
+    removed = pl.tracks.length - (newTracks.length - added);
+
+    // Stoppe si le morceau en cours appartient à cette playlist et a disparu
+    if (currentTrack?.playlistId === plId) {
+      const stillExists = newTracks.some(t => t.id === currentTrack.track.id);
+      if (!stillExists) stopAll();
+    }
+
+    newTracks.sort((a, b) => a.filepath.localeCompare(b.filepath));
+    pl.tracks = newTracks;
+    autoSave();
+    renderPlaylists();
+    showToast(`✓ Rescan "${pl.name}" — +${added} ajouté${added!==1?'s':''}, ${removed} supprimé${removed!==1?'s':''}`);
+  }
+
+  function removePlaylist(plId) {
+    const idx = playlists.findIndex(p => p.id === plId);
+    if (idx < 0) return;
+    const pl = playlists[idx];
+    // Stoppe si un morceau de cette playlist est en cours
+    if (currentTrack?.playlistId === plId) stopAll();
+    // Nettoie les handles et objectURLs d'album art en mémoire
+    pl.tracks.forEach(t => {
+      audioHandles.delete(String(t.id));
+      const url = trackArt.get(t.id);
+      if (url) URL.revokeObjectURL(url);
+      trackArt.delete(t.id);
+    });
+    playlistDirHandles.delete(plId);
+    playlists.splice(idx, 1);
+    autoSave();
+    renderPlaylists();
+  }
+
+  function movePlaylist(idx, dir) {
+    const target = idx + dir;
+    if (target < 0 || target >= playlists.length) return;
+    [playlists[idx], playlists[target]] = [playlists[target], playlists[idx]];
+    autoSave();
+    renderPlaylists();
+  }
+
+  async function playTrack(track, pl) {
+    engine.ensureCtx();
+    requestWakeLock();
+
+    // Toggle stop si ce morceau est déjà en cours
+    if (currentTrack?.track.id === track.id && mediaPlayer.isPlaying()) {
+      stopAll();
+      renderCueList(); renderPlaylists();
+      return;
+    }
+
+    if (!track.filepath) { showToast('⚠ Aucun fichier pour : ' + track.name); return; }
+
+    // Résolution du fichier depuis le handle du dossier playlist
+    const file = await _resolvePlaylistFile(track, pl);
+    if (!file) {
+      logger.error('[playTrack] Fichier introuvable : ' + track.filepath);
+      _updateLogBadge();
+      showToast('⚠ Fichier introuvable : ' + track.name);
+      return;
+    }
+
+    stopAll();
+    currentTrack = { track, playlistId: pl.id };
+    currentCue   = null;
+    currentPad   = null;
+
+    updateNpBar('playing', track.name);
+    showToast('▶ ' + track.name);
+
+    try {
+      await mediaPlayer.play(file, {
+        vol:     track.vol,
+        fadeIn:  track.fadeIn,
+        fadeOut: track.fadeOut,
+        startAt: track.startAt ?? 0,
+        loop:    track.loop,
+      }, () => {
+        currentTrack = null;
+        updateNpBar('idle');
+        renderPlaylists();
+      });
+    } catch(e) {
+      logger.error('[playTrack] mediaPlayer.play échoué : ' + e.message);
+      _updateLogBadge();
+      showToast('⚠ Erreur lecture : ' + track.name);
+      currentTrack = null;
+      updateNpBar('idle');
+      return;
+    }
+
+    startProgressLoop();
+    renderCueList(); renderPlaylists();
+  }
+
+  // Résout le File d'une piste playlist depuis le handle en mémoire ou IDB
+  async function _resolvePlaylistFile(track, pl) {
+    // 1. Handle déjà connu pour ce track (session courante)
+    const known = audioHandles.get(String(track.id));
+    if (known) {
+      try {
+        const file = await known.getFile();
+        // Extraction d'art en arrière-plan si pas encore fait
+        if (!trackArt.has(track.id)) _extractTrackArt(track.id, file).catch(() => {});
+        return file;
+      } catch(_) {}
+    }
+
+    // 2. Handle du dossier playlist en mémoire ou IDB
+    let dirHandle = playlistDirHandles.get(pl.id);
+    if (!dirHandle) {
+      dirHandle = await audioDirStore.get('rootPl-' + pl.id);
+      if (dirHandle) {
+        let perm = await dirHandle.queryPermission({ mode: 'read' });
+        if (perm !== 'granted') perm = await dirHandle.requestPermission({ mode: 'read' });
+        if (perm === 'granted') playlistDirHandles.set(pl.id, dirHandle);
+        else return null;
+      } else return null;
+    }
+    const fileMap = await _scanDir(dirHandle, '');
+    const fh = fileMap.get(track.filepath.normalize('NFC'));
+    if (!fh) return null;
+    try {
+      const file = await fh.getFile();
+      audioHandles.set(String(track.id), fh); // mémorise pour les prochains accès
+      if (!trackArt.has(track.id)) _extractTrackArt(track.id, file).catch(() => {});
+      return file;
+    } catch(_) { return null; }
+  }
+
+  function stopTrack(track) {
+    if (currentTrack?.track.id !== track.id) return;
+    stopAll();
+    renderCueList(); renderPlaylists();
+  }
+
+
+
+  function openEditTrack(trackId, plId) {
+    const pl = playlists.find(p => p.id === plId);
+    const track = pl?.tracks.find(t => t.id === trackId);
+    if (!track) return;
+
+    editingCueId = null;
+    editingTrackId = trackId;
+    editingTrackPlaylistId = plId;
+    modalTarget = 'track';
+
+    document.getElementById('modalTitle').textContent = track.name;
+    document.getElementById('fieldName').value    = track.name;
+    document.getElementById('fieldType').value    = track.type ?? 'music';
+    _setVolSlider(Math.round((track.vol ?? 0.8) * 100));
+    document.getElementById('fieldFadeIn').value  = track.fadeIn ?? 0;
+    document.getElementById('fieldFadeOut').value = track.fadeOut ?? 1;
+    document.getElementById('fieldStartAt').value = (track.startAt > 0) ? secToMmss(track.startAt) : '';
+    document.getElementById('fieldEndAt').value   = track.endAt
+      ? (track.endAt < 0 ? String(track.endAt) : secToMmss(track.endAt)) : '';
+    document.getElementById('fieldLoop').checked  = !!track.loop;
+    document.getElementById('fieldNotes').value   = track.notes ?? '';
+    const curFile = document.getElementById('fieldCurrentFile');
+    if (track.filepath) {
+      curFile.textContent = '📎 ' + track.filepath;
+      curFile.style.display = '';
+    } else {
+      curFile.style.display = 'none';
+    }
+    document.getElementById('fieldFileName').textContent = '';
+    document.getElementById('fieldFileName').className = 'file-name';
+    document.getElementById('fieldTimingGroup').style.display = '';
+    document.getElementById('fieldRangeGroup').style.display  = '';
+    document.getElementById('btnModalAdd').textContent = '💾 Sauvegarder';
+    document.getElementById('addModal').classList.add('open');
+  }
+
+  // ════════════════════════════════════════════════
+  // ALBUM ART — extraction ID3v2 (frame APIC)
+  // ════════════════════════════════════════════════
+
+  // Lit les premiers 512 Ko du fichier, cherche la frame APIC en ID3v2.3/2.4,
+  // crée un objectURL et le stocke dans trackArt. Re-rend les playlists si trouvé.
+  async function _extractTrackArt(trackId, file) {
+    if (trackArt.has(trackId)) return;
+    trackArt.set(trackId, null); // marquer comme traité dès le début (évite les appels doubles)
+    try {
+      const raw = new Uint8Array(await file.slice(0, 512 * 1024).arrayBuffer());
+      // Vérification header ID3v2
+      if (raw[0] !== 0x49 || raw[1] !== 0x44 || raw[2] !== 0x33) return; // pas "ID3"
+      const ver = raw[3]; // version majeure : 3 = ID3v2.3, 4 = ID3v2.4
+      if (ver < 3) return; // ID3v2.2 non supporté (frames à 3 chars)
+      // Taille totale du tag (4 octets syncsafe = 7 bits utiles chacun)
+      const tagEnd = 10 + (((raw[6] & 0x7f) << 21) | ((raw[7] & 0x7f) << 14) |
+                           ((raw[8] & 0x7f) <<  7) |  (raw[9] & 0x7f));
+      let off = 10;
+      if (raw[5] & 0x40) off += 4 + (((raw[10]&0x7f)<<21)|((raw[11]&0x7f)<<14)|((raw[12]&0x7f)<<7)|(raw[13]&0x7f)); // extended header
+      while (off + 10 < tagEnd && off + 10 < raw.length) {
+        const frameId = String.fromCharCode(raw[off], raw[off+1], raw[off+2], raw[off+3]);
+        // Taille frame : syncsafe en v2.4, entier en v2.3
+        const fSize = ver >= 4
+          ? (((raw[off+4]&0x7f)<<21)|((raw[off+5]&0x7f)<<14)|((raw[off+6]&0x7f)<<7)|(raw[off+7]&0x7f))
+          : ((raw[off+4]<<24)|(raw[off+5]<<16)|(raw[off+6]<<8)|raw[off+7]);
+        off += 10;
+        if (fSize <= 0 || fSize > tagEnd) break; // padding ou taille incohérente
+        if (frameId === 'APIC') {
+          let p = off;
+          const enc = raw[p++]; // 0=Latin1, 1=UTF16BOM, 2=UTF16BE, 3=UTF8
+          // Sauter le type MIME (null-terminé)
+          while (p < off + fSize && raw[p] !== 0) p++;
+          p++; // null terminal
+          p++; // picture type (3 = cover front)
+          // Sauter la description (null-terminé, double-null en UTF16)
+          if (enc === 1 || enc === 2) {
+            while (p < off + fSize - 1 && !(raw[p] === 0 && raw[p+1] === 0)) p += 2;
+            p += 2;
+          } else {
+            while (p < off + fSize && raw[p] !== 0) p++;
+            p++;
+          }
+          if (p < off + fSize) {
+            const url = URL.createObjectURL(new Blob([raw.slice(p, off + fSize)]));
+            trackArt.set(trackId, url);
+            renderPlaylists(); // re-render une fois l'art disponible
+          }
+          return;
+        }
+        off += fSize;
+      }
+    } catch(_) { /* silencieux — parse failure non bloquante */ }
+  }
+
+  function renderPlaylists() {
+    const list = document.getElementById('plList');
+    list.innerHTML = '';
+
+    const totalTracks = playlists.reduce((s, p) => s + p.tracks.length, 0);
+    document.getElementById('plCount').textContent = totalTracks;
+    const allCollapsed = playlists.length > 0 && playlists.every(pl => plCollapsed.has(pl.id));
+    document.getElementById('btnPlCollapseAll').classList.toggle('all-collapsed', allCollapsed);
+
+    playlists.forEach((pl, plIdx) => {
+      pl.tracks.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+      const group = document.createElement('div');
+      group.className = 'pl-group';
+
+      // En-tête du groupe
+      const isCollapsed = plCollapsed.has(pl.id);
+      const header = document.createElement('div');
+      header.className = 'pl-group-header';
+      const plNameEsc = escapeHtml(pl.name);
+      // Le chevron est toujours présent (repli indépendant du mode édition)
+      const editBtns = plEditMode ? `
+          <button class="pl-ea-btn" title="Rescanner le dossier" onclick="rescanPlaylist('${pl.id}')">↺</button>
+          <button class="pl-ea-btn" title="Monter" onclick="movePlaylist(${plIdx},-1)">↑</button>
+          <button class="pl-ea-btn" title="Descendre" onclick="movePlaylist(${plIdx},+1)">↓</button>
+          <button class="pl-ea-btn del" title="Supprimer" onclick="removePlaylist('${pl.id}')">✕</button>` : '';
+      header.innerHTML = `
+        <button class="pl-toggle${isCollapsed ? ' collapsed' : ''}" title="${isCollapsed ? 'Déplier' : 'Replier'}">▾</button>
+        <span class="pl-group-name" title="${plNameEsc}">${plNameEsc}
+          <span style="color:var(--text-dim);font-weight:400;font-size:10px">(${pl.tracks.length})</span>
+        </span>
+        ${editBtns}`;
+      // Toggle repli au clic sur l'en-tête ou le chevron
+      header.addEventListener('click', e => {
+        if (e.target.closest('.pl-ea-btn')) return; // ne pas interférer avec les boutons edit
+        if (plCollapsed.has(pl.id)) plCollapsed.delete(pl.id);
+        else plCollapsed.add(pl.id);
+        renderPlaylists();
+      });
+      group.appendChild(header);
+
+      // Grille 2 colonnes — masquée si repliée
+      const grid = document.createElement('div');
+      grid.className = 'pl-grid' + (isCollapsed ? ' hidden' : '');
+
+      pl.tracks.forEach(track => {
+        const isActive  = currentTrack?.track.id === track.id;
+        const isPaused  = isActive && mediaPlayer.isPaused();
+        const isPlaying = isActive && mediaPlayer.isPlaying();
+        // Pas d'AudioBuffer : le fichier est streamé à la demande — on vérifie juste le filepath
+        const hasFile   = !!track.filepath;
+        // Durée disponible uniquement pour la piste active (metadata chargée par <audio>)
+        const dur       = isActive ? mediaPlayer.getDuration() : null;
+        const durLabel  = track.loop ? '∞' : (dur ? secToMmss(dur) : '—');
+
+        const artUrl = trackArt.get(track.id);
+        const card = document.createElement('div');
+        card.className = 'pl-track' + (isActive ? (isPaused ? ' paused' : ' active') : '') + (artUrl ? ' has-art' : '');
+
+        const tnEsc   = escapeHtml(track.name);
+        const artHtml = artUrl ? `<img class="pl-track-art" src="${artUrl}" alt="" draggable="false">` : '';
+        // Le contenu est enveloppé dans .pl-track-body quand il y a de l'art (layout row)
+        const wrapOpen  = artUrl ? '<div class="pl-track-body">' : '';
+        const wrapClose = artUrl ? '</div>' : '';
+
+        if (plEditMode) {
+          card.innerHTML = `${artHtml}${wrapOpen}
+            <div class="pl-track-name">${tnEsc}</div>
+            <div class="pl-track-meta">
+              ${hasFile ? '●' : '<span style="opacity:.4">○</span>'}
+              <span style="margin-left:auto">${Math.round((track.vol??0.8)*100)}%</span>
+            </div>
+            <div class="pl-track-edit-overlay">
+              <button class="pl-track-edit-btn" title="Modifier">✏</button>
+              <button class="pl-track-edit-btn del" title="Supprimer">✕</button>
+            </div>${wrapClose}`;
+          card.querySelector('.pl-track-edit-btn:not(.del)').addEventListener('click', e => {
+            e.stopPropagation(); openEditTrack(track.id, pl.id);
+          });
+          card.querySelector('.pl-track-edit-btn.del').addEventListener('click', e => {
+            e.stopPropagation();
+            if (currentTrack?.track.id === track.id) stopAll();
+            engine.clearBuffer?.(track.id);
+            pl.tracks.splice(pl.tracks.indexOf(track), 1);
+            autoSave(); renderPlaylists();
+          });
+        } else {
+          card.innerHTML = `${artHtml}${wrapOpen}
+            <div class="pl-track-name">${tnEsc}</div>
+            <div class="pl-track-meta">
+              ${hasFile ? '●' : '<span style="opacity:.4">○</span>'}
+              <span style="margin-left:auto;font-size:9px">${durLabel}</span>
+            </div>
+            <div class="pl-track-transport">
+              ${isPlaying ? '' : `<button class="pl-btn play" title="Lecture">▶</button>`}
+              ${isActive  ? `<button class="pl-btn stop" title="Stop">■</button>` : ''}
+              <button class="pl-btn loop${track.loop ? ' on' : ''}" title="Boucle">🔁</button>
+            </div>${wrapClose}`;
+          card.querySelector('.pl-btn.play')?.addEventListener('click',  e => { e.stopPropagation(); playTrack(track, pl); });
+          card.querySelector('.pl-btn.stop')?.addEventListener('click',  e => { e.stopPropagation(); stopTrack(track); });
+          card.querySelector('.pl-btn.loop').addEventListener('click', e => {
+            e.stopPropagation(); track.loop = !track.loop; autoSave(); renderPlaylists();
+          });
+          card.addEventListener('click', () => playTrack(track, pl));
+        }
+        grid.appendChild(card);
+      });
+
+      group.appendChild(grid);
+      list.appendChild(group);
+    });
+
+    // Bouton d'ajout de playlist (toujours visible en mode édition, sinon caché)
+    if (plEditMode || playlists.length === 0) {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'pl-add-playlist';
+      addBtn.textContent = '＋ Ajouter une playlist';
+      addBtn.addEventListener('click', addPlaylist);
+      list.appendChild(addBtn);
+    }
+  }
+
+  // ════════════════════════════════════════════════
   // MODAL — Création cue / pad avec chargement audio
   // ════════════════════════════════════════════════
   function openAddModal(target) {
@@ -2402,6 +3306,8 @@
   function closeModal() {
     document.getElementById('addModal').classList.remove('open');
     editingCueId = null;
+    editingTrackId = null;
+    editingTrackPlaylistId = null;
     _pendingFileHandle = null;
     _pendingFile = null;
     document.getElementById('btnModalAdd').textContent = 'Ajouter';
@@ -2506,7 +3412,7 @@
       document.getElementById('fieldEndAt').value   = '';
       renderCueList();
       autoSave();
-    } else {
+    } else if (modalTarget === 'pad') {
       const id = 'p' + Date.now();
       const newPad = { id, name, type, vol, emoji: file ? guessEmoji(file.name) : typeEmojis[type] };
       if (file) newPad.filepath = file.name;
@@ -2518,6 +3424,32 @@
         showToast('✓ "' + name + '" ajouté (sans fichier)');
       }
       renderPads();
+      autoSave();
+    } else if (modalTarget === 'track') {
+      // Édition d'un morceau de playlist
+      const pl = playlists.find(p => p.id === editingTrackPlaylistId);
+      const track = pl?.tracks.find(t => t.id === editingTrackId);
+      if (track) {
+        const startAt = mmssToSec(document.getElementById('fieldStartAt').value.trim());
+        const endAt   = parseEndAt(document.getElementById('fieldEndAt').value);
+        const loop    = document.getElementById('fieldLoop').checked;
+        track.name    = name;
+        track.type    = type;
+        track.vol     = vol;
+        track.fadeIn  = fadeIn;
+        track.fadeOut = fadeOut;
+        track.startAt = startAt;
+        track.endAt   = endAt;
+        track.loop    = loop;
+        track.notes   = notes;
+        if (file) {
+          // Playlists = streaming via <audio>, on stocke uniquement le handle (pas d'AudioBuffer)
+          if (handle) audioHandles.set(String(track.id), handle);
+          track.filepath = file.name;
+        }
+        showToast('✓ Morceau mis à jour');
+      }
+      renderPlaylists();
       autoSave();
     }
 
@@ -2562,12 +3494,15 @@
     currentProjectName   = null;
     currentAudioRootSeq  = null;
     currentAudioRootPads = null;
+    playlists.length = 0;
+    playlistDirHandles.clear();
     projectFile.clear();
     localStorage.removeItem('impromusic-last-project');
     document.querySelector('.project-name').textContent = '—';
     document.getElementById('loadBanner').classList.add('hidden');
     renderCueList();
     renderPads();
+    renderPlaylists();
     showToast('✦ Nouveau spectacle');
   }
 
@@ -2705,6 +3640,11 @@
   function closeEmojiPicker() {
     document.getElementById('emojiPicker')?.remove();
     emojiPickerTarget = null;
+  }
+
+  // Échappe les caractères HTML spéciaux pour injection sécurisée dans innerHTML
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   function cleanFileName(name) {
@@ -2927,7 +3867,8 @@
   }
 
   function _buildAudioItems() {
-    // kind='seq' pour la séquence, kind='pad' pour les sons libres
+    // Les pistes playlist sont exclues : elles utilisent <audio> streamé à la demande,
+    // pas d'AudioBuffer → pas de préchargement en RAM.
     const items = [
       ...cues.filter(c => c.type !== 'section' && c.filepath).map(c => ({ id: c.id, filepath: c.filepath, name: c.name, kind: 'seq' })),
       ...pads.filter(p => p.filepath).map(p => ({ id: p.id, filepath: p.filepath, name: p.name, kind: 'pad' })),
@@ -2943,6 +3884,20 @@
   // vérifie que le nom du dossier correspond au projet chargé,
   // puis scanne récursivement → Map<relpath, FileHandle>.
   async function _buildDirFileMap(kind) {
+    // Gestion des playlists libres : kind = 'pl-<playlistId>'
+    if (kind.startsWith('pl-')) {
+      const plId = kind.slice(3);
+      const pl   = playlists.find(p => p.id === plId);
+      if (!pl) return new Map();
+      let dirHandle = playlistDirHandles.get(plId) ?? await audioDirStore.get('rootPl-' + plId);
+      if (!dirHandle) return new Map();
+      if (pl.audioRoot && dirHandle.name !== pl.audioRoot) return new Map();
+      let perm = await dirHandle.queryPermission({ mode: 'read' });
+      if (perm !== 'granted') perm = await dirHandle.requestPermission({ mode: 'read' });
+      if (perm !== 'granted') return new Map();
+      playlistDirHandles.set(plId, dirHandle);
+      return _scanDir(dirHandle, '');
+    }
     const storeKey    = kind === 'pad' ? 'rootPads' : 'rootSeq';
     const expectedName = kind === 'pad' ? currentAudioRootPads : currentAudioRootSeq;
     const root = await audioDirStore.get(storeKey);
@@ -2963,10 +3918,17 @@
     const btnStyle = 'background:var(--accent);color:var(--on-accent);border:none;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:6px;';
     const btnSeq   = hasSeq  ? `<button onclick="loadMissingSounds('seq')"  style="${btnStyle}">📁 Musiques${currentAudioRootSeq  ? ` <em>("${currentAudioRootSeq}")</em>`  : ''}</button>` : '';
     const btnPads  = hasPads ? `<button onclick="loadMissingSounds('pad')"  style="${btnStyle}">📁 Sons libres${currentAudioRootPads ? ` <em>("${currentAudioRootPads}")</em>` : ''}</button>` : '';
+    // Boutons par playlist manquante
+    const missingPlIds = [...new Set(missing.filter(m => m.kind.startsWith('pl-')).map(m => m.kind.slice(3)))];
+    const btnsPl = missingPlIds.map(plId => {
+      const pl = playlists.find(p => p.id === plId);
+      if (!pl) return '';
+      return `<button onclick="loadMissingPlaylist('${plId}')" style="${btnStyle}">📁 ${escapeHtml(pl.name)}</button>`;
+    }).join('');
     banner.innerHTML = `
       <div class="load-dot" style="background:var(--red)"></div>
       <span title="${names.join('\n')}">${names.length} son${names.length > 1 ? 's' : ''} manquant${names.length > 1 ? 's' : ''} : <em>${preview}</em></span>
-      ${btnSeq}${btnPads}
+      ${btnSeq}${btnPads}${btnsPl}
       <button onclick="document.getElementById('loadBanner').classList.add('hidden')" style="
         background:none;border:none;color:var(--text-muted);font-size:16px;
         cursor:pointer;margin-left:auto;padding:0 4px;">✕</button>
@@ -3001,13 +3963,14 @@
     }
 
     // Essai 2 : dossiers persistés en IDB → requestPermission (1 clic)
-    // Séquence et sons libres peuvent avoir des dossiers racine distincts :
-    // on regroupe les manquants par kind pour ne faire qu'un scan par dossier.
+    // Chaque kind distinct (seq, pad, pl-xxx) fait un seul scan de dossier.
     if (missing.length && window.showDirectoryPicker) {
       text.textContent = 'Restauration des dossiers audio…';
-      const byKind = { seq: missing.filter(i => i.kind === 'seq'), pad: missing.filter(i => i.kind === 'pad') };
+      // Collecte tous les kinds présents dans missing (seq, pad, pl-<id>…)
+      const allKinds = [...new Set(missing.map(i => i.kind))];
+      const byKind = Object.fromEntries(allKinds.map(k => [k, missing.filter(i => i.kind === k)]));
       const stillMissing = [];
-      for (const kind of ['seq', 'pad']) {
+      for (const kind of allKinds) {
         if (!byKind[kind].length) continue;
         try {
           const dirMap = await _buildDirFileMap(kind);
@@ -3027,7 +3990,7 @@
       missing = stillMissing;
     }
 
-    renderCueList(); renderPads();
+    renderCueList(); renderPads(); renderPlaylists();
 
     if (!missing.length) {
       text.textContent = `✓ ${loaded} sons chargés`;
@@ -3063,6 +4026,24 @@
     autoSave(); // persiste audioRootSeq/audioRootPads dans le JSON
   }
 
+  // Recharge les sons d'une playlist après que l'utilisateur a re-sélectionné son dossier
+  async function loadMissingPlaylist(plId) {
+    if (!window.showDirectoryPicker) return;
+    const pl = playlists.find(p => p.id === plId);
+    if (!pl) return;
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+    } catch(e) { return; }
+    pl.audioRoot = dirHandle.name;
+    playlistDirHandles.set(plId, dirHandle);
+    await audioDirStore.set('rootPl-' + plId, dirHandle);
+    // Efface les handles de fichiers périmés pour ce dossier
+    pl.tracks.forEach(t => audioHandles.delete(String(t.id)));
+    showToast('✓ Dossier "' + dirHandle.name + '" lié');
+    autoSave();
+  }
+
   // ════════════════════════════════════════════════
   // GESTION DES SPECTACLES — fichiers JSON
   // ════════════════════════════════════════════════
@@ -3073,7 +4054,7 @@
 
   function _buildProjectPayload() {
     return {
-      version: '1.1',
+      version: '1.2',
       name: currentProjectName ?? 'Sans titre',
       savedAt: new Date().toISOString(),
       audioRootSeq:  currentAudioRootSeq  ?? undefined,
@@ -3084,6 +4065,12 @@
         return { ...rest, state: c.state === 'playing' ? 'pending' : c.state };
       }),
       pads: pads.map(p => ({ ...p })),
+      playlists: playlists.map(pl => ({
+        id: pl.id,
+        name: pl.name,
+        audioRoot: pl.audioRoot,
+        tracks: pl.tracks.map(t => ({ ...t })),
+      })),
     };
   }
 
@@ -3108,8 +4095,14 @@
     (data.cues ?? []).forEach(c => {
       if (c.dbKey && !c.filepath) { c.filepath = c.dbKey; delete c.dbKey; }
       if (c.url   && !c.filepath) { c.filepath = c.url;   delete c.url;   }
+      // Réinitialise l'état à chaque chargement — chaque session repart de zéro
+      c.state = 'pending';
+      delete c._prevState;
       cues.push(c);
     });
+    // Le premier cue non-section visible passe à "next" (prêt à jouer)
+    const first = cues.find(c => !c.hidden && c.type !== 'section');
+    if (first) first.state = 'next';
     pads.length = 0;
     (data.pads ?? []).forEach(p => {
       if (p.dbKey && !p.filepath) { p.filepath = p.dbKey; delete p.dbKey; }
@@ -3120,6 +4113,16 @@
     // Migration : ancien format audioRoot unique → appliqué aux deux types
     currentAudioRootSeq  = data.audioRootSeq  ?? data.audioRoot ?? null;
     currentAudioRootPads = data.audioRootPads ?? data.audioRoot ?? null;
+    // Restaure les playlists — les handles IDB seront rechargés à la demande
+    playlists.length = 0;
+    playlistDirHandles.clear();
+    (data.playlists ?? []).forEach(pl => {
+      pl.tracks = (pl.tracks ?? []).map(t => ({
+        vol: 0.8, fadeIn: 0, fadeOut: 1, startAt: 0, endAt: 0, loop: false,
+        ...t,
+      }));
+      playlists.push(pl);
+    });
     document.querySelector('.project-name').textContent = currentProjectName ?? '—';
   }
 
@@ -3136,6 +4139,7 @@
       _cacheProject();
       renderCueList();
       renderPads();
+      renderPlaylists();
       showToast('📂 ' + result.name + ' — vérification des fichiers…');
       await preloadAllSounds();
     } catch(e) {
@@ -3247,6 +4251,48 @@
   // DIVISEUR GLISSABLE — resize séquence / notes
   // ════════════════════════════════════════════════
   (() => {
+    // ── Diviseur colonnes principales (col-seq / col-playlists) ──
+    (() => {
+      const COLS_PCT_KEY = 'impromusic-cols-pct';
+      const MIN_COLS = 30, MAX_COLS = 80;
+
+      function applyColsPct(pct) {
+        document.querySelector('.main-columns').style.setProperty('--cols-pct', pct + '%');
+      }
+
+      const savedCols = parseFloat(localStorage.getItem(COLS_PCT_KEY));
+      applyColsPct(isNaN(savedCols) ? 65 : savedCols);
+
+      const colsHandle = document.getElementById('colsDivider');
+      let colsDragging = false, colsStartX = 0, colsStartPct = 65;
+
+      colsHandle.addEventListener('pointerdown', e => {
+        colsDragging = true;
+        colsStartX   = e.clientX;
+        colsStartPct = parseFloat(getComputedStyle(document.querySelector('.main-columns')).getPropertyValue('--cols-pct')) || 65;
+        colsHandle.classList.add('dragging');
+        colsHandle.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+
+      colsHandle.addEventListener('pointermove', e => {
+        if (!colsDragging) return;
+        const totalW = document.querySelector('.main-columns').getBoundingClientRect().width;
+        const delta  = e.clientX - colsStartX;
+        const newPct = Math.min(MAX_COLS, Math.max(MIN_COLS, colsStartPct + delta / totalW * 100));
+        applyColsPct(newPct);
+      });
+
+      colsHandle.addEventListener('pointerup', () => {
+        if (!colsDragging) return;
+        colsDragging = false;
+        colsHandle.classList.remove('dragging');
+        const pct = parseFloat(getComputedStyle(document.querySelector('.main-columns')).getPropertyValue('--cols-pct')) || 65;
+        localStorage.setItem(COLS_PCT_KEY, pct);
+      });
+    })();
+
+    // ── Diviseur interne seq / notes ──
     const SEQ_PCT_KEY = 'impromusic-seq-pct';
     const MIN_PCT = 25, MAX_PCT = 80;
 
@@ -3324,8 +4370,35 @@
     document.getElementById('btnLog').style.outline = hasErrors ? '2px solid var(--red)' : '';
   }
 
+  const FONT_KEY     = 'impromusic-font';
+  const DEFAULT_FONT = 'Inter';
+  const FONTS = ['Inter', 'DM Sans', 'Nunito', 'Roboto', 'Source Sans 3'];
+
+  function applyFont(name) {
+    document.documentElement.style.setProperty('--font-ui', `'${name}', sans-serif`);
+    document.querySelectorAll('.font-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.font === name)
+    );
+  }
+
+  function loadSavedFont() {
+    applyFont(localStorage.getItem(FONT_KEY) ?? DEFAULT_FONT);
+  }
+
+  function _buildFontPicker() {
+    const current = localStorage.getItem(FONT_KEY) ?? DEFAULT_FONT;
+    document.querySelectorAll('.font-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.font === current);
+      btn.onclick = () => {
+        localStorage.setItem(FONT_KEY, btn.dataset.font);
+        applyFont(btn.dataset.font);
+      };
+    });
+  }
+
   function openThemePanel() {
     _buildThemeRows();
+    _buildFontPicker();
     document.getElementById('themePanel').classList.add('open');
     document.getElementById('themeOverlay').classList.add('open');
   }
@@ -3338,7 +4411,10 @@
   function resetTheme() {
     applyFullTheme(DEFAULT_THEME);
     localStorage.removeItem('impromusic-theme');
+    localStorage.removeItem(FONT_KEY);
+    applyFont(DEFAULT_FONT);
     _buildThemeRows();
+    _buildFontPicker();
     showToast('↺ Thème réinitialisé');
   }
 
@@ -3384,6 +4460,7 @@
 
   // Charge le thème sauvegardé au démarrage
   loadSavedTheme();
+  loadSavedFont();
 
   // ════════════════════════════════════════════════
   // MIGRATION — anciens spectacles IndexedDB → JSON
@@ -3428,7 +4505,7 @@
     document.getElementById('btnMigrate').addEventListener('click', () => {
       projects.forEach(p => {
         const payload = {
-          version: '1.1',
+          version: '1.2',
           name: p.name,
           savedAt: p.savedAt,
           cues: (p.cues ?? []).map(c => ({ ...c, state: c.state === 'playing' ? 'pending' : c.state })),
@@ -3447,6 +4524,31 @@
     });
   }
 
+  // Charge les vignettes album art pour toutes les playlists au lancement.
+  // N'utilise que queryPermission (pas de requestPermission) — silencieux si la
+  // permission n'est plus accordée (l'utilisateur n'a rien à cliquer).
+  async function _warmPlaylistArt() {
+    for (const pl of playlists) {
+      try {
+        let dirHandle = playlistDirHandles.get(pl.id) ?? await audioDirStore.get('rootPl-' + pl.id);
+        if (!dirHandle) continue;
+        const perm = await dirHandle.queryPermission({ mode: 'read' });
+        if (perm !== 'granted') continue; // permission expirée — on ne demande pas
+        playlistDirHandles.set(pl.id, dirHandle);
+        const fileMap = await _scanDir(dirHandle, '');
+        // Extraction en parallèle pour tous les tracks de la playlist
+        await Promise.all(pl.tracks.map(async t => {
+          if (trackArt.has(t.id)) return;
+          const fh = fileMap.get((t.filepath ?? '').normalize('NFC'));
+          if (!fh) return;
+          const file = await fh.getFile();
+          audioHandles.set(t.id, fh); // prime le cache pour le premier Play
+          await _extractTrackArt(t.id, file);
+        }));
+      } catch(_) { /* silencieux — handle invalide ou permission perdue */ }
+    }
+  }
+
   // ── INIT ──
   // Restaure le projet depuis le cache localStorage.
   // Les sons ne sont pas persistés — l'utilisateur
@@ -3455,8 +4557,10 @@
     _restoreCachedProject();
     renderCueList();
     renderPads();
-    await preloadAllSounds();   // affiche le bandeau si des sons sont attendus
+    renderPlaylists();
+    await preloadAllSounds();    // affiche le bandeau si des sons sont attendus
     await _migrateOldProjects(); // détecte les anciens spectacles IndexedDB à migrer
+    _warmPlaylistArt();          // charge les vignettes en arrière-plan (sans bloquer)
   })();
 </script>
 </body>
