@@ -1,6 +1,6 @@
 # ImproMusic — Manuel utilisateur v1.3
 **Date** : 2026-05-05
-**Version** : 1.3.0
+**Version** : 1.3.1
 **Plateforme** : Chrome Android (tablette) — fonctionne aussi sur Chrome desktop
 
 ---
@@ -238,6 +238,13 @@ Le bouton 🪲 s'entoure d'un contour rouge quand une erreur est détectée.
 ---
 
 ## Changelog
+
+### v1.3.1 (2026-05-05)
+
+#### Corrections
+- **Playlists bloquées au chargement** : quand Chrome a besoin d'une confirmation de permission sur un dossier playlist déjà connu, l'application affichait silencieusement les morceaux sans pouvoir les jouer. Désormais un bouton **🔒 NomPlaylist** apparaît dans le bandeau orange ; un clic (geste utilisateur requis par Chrome) accorde la permission et charge les fichiers immédiatement.
+
+---
 
 ### v1.3.0 (2026-05-05)
 
